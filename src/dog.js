@@ -58,7 +58,7 @@ class Dog{
     this.mesh=new THREE.SkinnedMesh(new THREE.BufferGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,map:SKIN_TEX,bumpMap:FUR_TEX,bumpScale:0.004,roughness:0.9})); this.root.add(this.mesh);
     this.body=bone('body',this.mesh,[0,0.78,0]);
     this.neck=bone('neck',this.body,[0,0.14,0.44]); this.head=bone('head',this.neck,[0,0.38,0.30]); this.jaw=bone('jaw',this.head,[0,-0.1,0.13]);
-    this.ears=[1,-1].map(s=>{const e=bone('ear'+s,this.head,[0.17*s,0.15,-0.05]);e.userData.side=s;return e;});
+    this.ears=[1,-1].map(s=>{const e=bone('ear'+s,this.head,[0.16*s,0.17,-0.06]);e.userData.side=s;return e;});
     const leg=(n,x,z,rear)=>{const r=REST[n];const up=bone(n+'Up',this.body,[x,0,z],r[0]);const knee=bone(n+'Knee',up,[0,rear?-0.39:-0.36,0],r[1]);const paw=bone(n+'Paw',knee,[0,rear?-0.35:-0.32,0],-(r[0]+r[1]));return {up,knee,paw,rear};};
     this.legs={fl:leg('fl',0.2,0.42,false),fr:leg('fr',-0.2,0.42,false),rl:leg('rl',0.19,-0.52,true),rr:leg('rr',-0.19,-0.52,true)};
     this.tail=[]; let par=this.body; for(let i=0;i<5;i++){ par=bone('tail'+i,par,i===0?[0,0.02,-0.74]:[0,-0.17,0]); this.tail.push(par); }
@@ -79,17 +79,19 @@ class Dog{
     if(lh){ P('sph',this.body,[0,-0.18,0.52],[0.25,0.24,0.16],C.F,0.17); P('sph',this.body,[0.19,0.0,0.46],[0.12,0.17,0.11],C.L,0.15); P('sph',this.body,[-0.19,0.0,0.46],[0.12,0.17,0.11],C.L,0.15); }
     P('cyl',this.neck,[0,0.17,0.13],[0.15,0.56,0.16],C.B,0.07,'body',[0.62,0,0]); if(lh){ P('cyl',this.neck,[0,0.22,0.06],[0.13,0.44,0.11],C.S,0.08,'body',[0.62,0,0]); P('sph',this.neck,[0.14,0.14,0.16],[0.1,0.2,0.13],C.L,0.16,'body'); P('sph',this.neck,[-0.14,0.14,0.16],[0.1,0.2,0.13],C.L,0.16,'body'); }
     // cabeza en cuña: cráneo, frente con "stop", hocico más largo y angosto, cachetes, cejas
-    P('sph',this.head,[0,0,0],[0.22,0.2,0.24],C.B,0.025,'head'); P('sph',this.head,[0,0.075,0.0],[0.21,0.16,0.24],C.S,0.028,'head');
-    P('sph',this.head,[0,0.05,0.1],[0.17,0.13,0.15],C.S,0.02,'head');       // frente (negra)
-    P('sph',this.head,[0,0.02,0.17],[0.18,0.09,0.13],C.K,0.012,'head');    // máscara alrededor de los ojos
-    P('sph',this.head,[0,-0.02,0.27],[0.125,0.095,0.29],C.K,0.012,'head');  // hocico
-    P('sph',this.head,[0,-0.005,0.47],[0.085,0.075,0.085],C.K,0.008,'head');// punta del hocico
-    P('sph',this.head,[0.165,-0.06,0.07],[0.11,0.11,0.13],C.B,0.06,'head'); P('sph',this.head,[-0.165,-0.06,0.07],[0.11,0.11,0.13],C.B,0.06,'head');   // cachetes peludos
-    P('sph',this.head,[0.09,0.105,0.185],[0.045,0.028,0.038],C.L,0.012,'head'); P('sph',this.head,[-0.09,0.105,0.185],[0.045,0.028,0.038],C.L,0.012,'head');   // cejas fuego
-    P('cut',this.head,[0,-0.1,0.36],[0.24,0.05,0.4],0,0,'head');           // ranura de la boca
+    P('sph',this.head,[0,0,-0.02],[0.2,0.2,0.24],C.B,0.025,'head'); P('sph',this.head,[0,0.08,-0.01],[0.185,0.15,0.24],C.S,0.028,'head');
+    P('sph',this.head,[0,0.06,0.09],[0.15,0.115,0.17],C.S,0.02,'head');     // frente (negra), en cuña
+    P('sph',this.head,[0,0.09,0.19],[0.075,0.055,0.1],C.S,0.014,'head');   // caballete sobre el stop
+    P('sph',this.head,[0,0.02,0.16],[0.165,0.085,0.12],C.K,0.012,'head');   // máscara alrededor de los ojos
+    P('sph',this.head,[0,-0.02,0.29],[0.11,0.09,0.31],C.K,0.012,'head');    // hocico más largo y angosto
+    P('sph',this.head,[0,-0.045,0.33],[0.115,0.06,0.24],C.K,0.01,'head');   // belfos (labio superior que cuelga)
+    P('sph',this.head,[0,-0.005,0.52],[0.08,0.072,0.08],C.K,0.008,'head');  // punta del hocico
+    P('sph',this.head,[0.15,-0.07,0.03],[0.1,0.11,0.13],C.B,0.06,'head'); P('sph',this.head,[-0.15,-0.07,0.03],[0.1,0.11,0.13],C.B,0.06,'head');   // cachetes peludos, atrás
+    P('sph',this.head,[0.085,0.11,0.19],[0.042,0.026,0.036],C.L,0.012,'head'); P('sph',this.head,[-0.085,0.11,0.19],[0.042,0.026,0.036],C.L,0.012,'head');   // cejas fuego
+    P('cut',this.head,[0,-0.105,0.4],[0.22,0.05,0.44],0,0,'head');         // ranura de la boca
     P('cutsph',this.head,[0.105,0.055,0.275],[0.066,0.058,0.085],0,0,'head'); P('cutsph',this.head,[-0.105,0.055,0.275],[0.066,0.058,0.085],0,0,'head'); // cuencas (alargadas hacia afuera para abrir la superficie)
-    P('sph',this.jaw,[0,-0.04,0.13],[0.082,0.048,0.22],C.K,0.008,'head');
-    for(const e of this.ears){ P('sph',e,[0,0.2,-0.005],[0.11,0.25,0.045],C.S,0.03,'head'); P('sph',e,[0,0.18,0.025],[0.085,0.2,0.03],C.L,0.045,'head'); P('sph',e,[0,0.02,0.02],[0.09,0.07,0.07],C.L,0.08,'head'); }
+    P('sph',this.jaw,[0,-0.04,0.16],[0.078,0.046,0.25],C.K,0.008,'head');
+    for(const e of this.ears){ P('sph',e,[0,0.21,-0.005],[0.115,0.27,0.045],C.S,0.03,'head'); P('sph',e,[0,0.18,0.025],[0.085,0.2,0.03],C.L,0.045,'head'); P('sph',e,[0,0.02,0.02],[0.09,0.07,0.07],C.L,0.08,'head'); }
     // patas: brazo/muslo, articulación, antebrazo/pierna, y pie con dedos
     for(const n of ['fl','fr','rl','rr']){ const L=this.legs[n], rear=L.rear;
       if(rear){ P('cyl',L.up,[0,-0.19,0],[0.1,0.38,0.11],C.B,0.03); P('sph',L.up,[0,-0.02,-0.03],[0.12,0.2,0.15],C.S,0.065); if(lh) P('sph',L.up,[0,-0.19,-0.09],[0.11,0.2,0.11],C.L,0.15);
@@ -111,12 +113,12 @@ class Dog{
       const lid=mkMesh(lidG,mLid,e,[0,0,0],[0.05,0.042,0.044]); lid.castShadow=false; lid.rotation.x=-1.15; this.lids.push(lid);   // párpado superior: rota para cerrar
       const lidB=mkMesh(lidG,mLid,e,[0,0,0],[0.05,0.042,0.044]); lidB.castShadow=false; lidB.rotation.x=Math.PI+1.05;   // párpado inferior fijo
       return e;});
-    this.meshes.push(mkMesh(sphG,mN,this.head,[0,0.03,0.545],[0.05,0.042,0.046]));
-    [0.02,-0.02].forEach(x=>mkMesh(sphG,mNostril,this.head,[x,0.025,0.595],[0.012,0.014,0.008]).castShadow=false);
-    mkMesh(sphG,mMouth,this.head,[0,-0.09,0.3],[0.1,0.045,0.24]).castShadow=false;
+    this.meshes.push(mkMesh(sphG,mN,this.head,[0,0.03,0.595],[0.05,0.042,0.046]));
+    [0.02,-0.02].forEach(x=>mkMesh(sphG,mNostril,this.head,[x,0.025,0.645],[0.012,0.014,0.008]).castShadow=false);
+    mkMesh(sphG,mMouth,this.head,[0,-0.09,0.34],[0.095,0.045,0.27]).castShadow=false;
     const toothG=new THREE.ConeGeometry(1,1,8);
-    [0.055,-0.055].forEach(x=>{ mkMesh(toothG,mTooth,this.head,[x,-0.09,0.43],[0.012,0.035,0.012],[Math.PI,0,0]).castShadow=false; mkMesh(toothG,mTooth,this.jaw,[x*0.85,0.0,0.33],[0.01,0.03,0.01]).castShadow=false; });
-    this.tongue=mkMesh(new THREE.CapsuleGeometry(0.5,1,4,10),mTongue,this.jaw,[0,0.0,0.2],[0.075,0.02,0.09],[Math.PI/2,0,0]);
+    [0.055,-0.055].forEach(x=>{ mkMesh(toothG,mTooth,this.head,[x,-0.09,0.48],[0.012,0.035,0.012],[Math.PI,0,0]).castShadow=false; mkMesh(toothG,mTooth,this.jaw,[x*0.85,0.0,0.37],[0.01,0.03,0.01]).castShadow=false; });
+    this.tongue=mkMesh(new THREE.CapsuleGeometry(0.5,1,4,10),mTongue,this.jaw,[0,0.0,0.24],[0.075,0.02,0.09],[Math.PI/2,0,0]);
     // sombra de contacto suave bajo el cuerpo
     this.blob=new THREE.Mesh(new THREE.PlaneGeometry(1.7,1.1),new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false})); this.blob.rotation.x=-Math.PI/2; this.blob.position.y=0.006; this.blob.renderOrder=-1; this.blob.userData.noAO=true; this.root.add(this.blob);
     // ---- construir la piel
@@ -150,7 +152,7 @@ class Dog{
     // y ahí se colocan el ojo y la cuenca (antes quedaban enterrados dentro de la máscara y la frente)
     { const hp=V3().setFromMatrixPosition(this.head.matrixWorld); this.eyeLocal=[];
       const sample=(x,y,z)=>{ const i=Math.round((x-mn[0])/h),j=Math.round((y-mn[1])/h),k=Math.round((z-mn[2])/h); if(i<0||j<0||k<0||i>=nx||j>=ny||k>=nz) return 1; return D[idx(i,j,k)]; };
-      [V3(0.105,0.055,0.262),V3(-0.105,0.055,0.262)].forEach((ed,i)=>{ const d=ed.clone().normalize(); let ts=0.3; for(let t=0.08;t<0.6;t+=h*0.5){ if(sample(hp.x+d.x*t,hp.y+d.y*t,hp.z+d.z*t)>0){ ts=t; break; } }
+      [V3(0.1,0.06,0.25),V3(-0.1,0.06,0.25)].forEach((ed,i)=>{ const d=ed.clone().normalize(); let ts=0.3; for(let t=0.08;t<0.6;t+=h*0.5){ if(sample(hp.x+d.x*t,hp.y+d.y*t,hp.z+d.z*t)>0){ ts=t; break; } }
         const eyeP=d.clone().multiplyScalar(ts-0.035); this.eyeLocal.push(eyeP); this.eyes[i].position.copy(eyeP);
         const cut=this.prims.find(P=>P.type==='cutsph'&&Math.sign(P.pos[0])===Math.sign(ed.x)); const cp=d.clone().multiplyScalar(ts+0.005); cut.pos=[cp.x,cp.y,cp.z]; cut.scl=[0.058,0.05,0.07]; cut.ext=cut.scl;
         e.set(0,0,0); q.setFromEuler(e); m4.compose(V3(...cut.pos),q,one); cut.world=cut.bone.matrixWorld.clone().multiply(m4); cut.inv=cut.world.clone().invert(); cut.ie=cut.inv.elements;
@@ -192,9 +194,9 @@ class Dog{
         out.copy(mixc(cB,cL,belly)); out.lerp(cF,gold); out.lerp(cS,black*(1-gold)); return; }
       if(name==='neck'){ const top=sm(ny-0.3+nz1,0.25), front=sm(nz-0.45,0.25)*(1-top); out.copy(mixc(cB,cF,front)); out.lerp(cS,top); return; }
       if(name==='head'){ const hx=lp.x,hy=lp.y,hz=lp.z;
-        const muzzle=sm(hz-0.13+nz1,0.06)*sm(0.1-hy,0.05); const eyes=sm(hz-0.09,0.05)*sm(0.13-hy,0.05)*sm(0.16-Math.abs(hx),0.05);
+        const muzzle=sm(hz-0.15+nz1,0.06)*sm(0.1-hy,0.05); const eyes=sm(hz-0.09,0.05)*sm(0.13-hy,0.05)*sm(0.16-Math.abs(hx),0.05);
         const cap=sm(hy-0.045+nz1,0.05)*sm(0.22-hz,0.06); const cheek=sm(Math.abs(hx)-0.11,0.05)*sm(0.05-hy,0.05);
-        const brow=Math.max(sm(0.045-Math.hypot(hx-0.09,hy-0.105,hz-0.185),0.02),sm(0.045-Math.hypot(hx+0.09,hy-0.105,hz-0.185),0.02));
+        const brow=Math.max(sm(0.042-Math.hypot(hx-0.085,hy-0.11,hz-0.19),0.02),sm(0.042-Math.hypot(hx+0.085,hy-0.11,hz-0.19),0.02));
         out.copy(cB); out.lerp(cS,cap); out.lerp(cK,Math.max(muzzle,eyes)*(1-cheek*0.7)); out.lerp(cL,brow); return; }
       if(name==='jaw'){ out.copy(cK); out.lerp(cB,sm(-0.05-lp.y,0.03)); return; }
       if(name.startsWith('ear')){ const front=sm(lp.z-0.0+nz1,0.03), base=sm(0.06-lp.y,0.04); out.copy(mixc(cS,cL,front)); out.lerp(cB,base); return; }
@@ -251,7 +253,7 @@ class Dog{
   zoneAt(hit){ if(hit.object.userData.zone) return hit.object.userData.zone; if(hit.object===this.mesh&&hit.face) return ZONES[this.zoneAttr[hit.face.a]]; return 'body'; }
   setPose(p,extra){Object.assign(this.target,basePose(),p,extra||{});}
   worldPos(local,obj){return (obj||this.head).localToWorld(this.tmp.copy(local));}
-  mouthPos(){return this.worldPos(V3(0,-0.12,0.45));}
+  mouthPos(){return this.worldPos(V3(0,-0.12,0.5));}
   animate(dt,o){ // o: {wag, mood}
     const p=this.pose,t=this.target,k=1-Math.exp(-9*dt);
     for(const key in p) p[key]=lerp(p[key],t[key],k);
