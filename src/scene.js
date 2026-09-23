@@ -199,7 +199,7 @@ function furMaterial(color,len,layer,layers,opts={}){ const vertex=!!opts.vertex
       transformed+=nrm*d + down*d*q*0.5 + flow*d*q*0.6 + vec3(0.0,0.0,-1.0)*d*q*uDrag*0.18 + vec3(sin(uTime*2.1+position.y*7.0),0.0,cos(uTime*1.7+position.x*6.0))*d*q*0.10;`);
     sh.fragmentShader='uniform float uLayer; uniform sampler2D tDetail;\n'+(vertex?'varying float vLen;\n':'')+sh.fragmentShader
       .replace('#include <alphamap_fragment>',`#ifdef USE_ALPHAMAP
-        ${vertex?'if(vLen<0.006) discard;':''}
+        ${vertex?'if(vLen<0.016) discard;':''}
         float hair=texture2D(alphaMap,vAlphaMapUv).g; diffuseColor.a*=step(0.05+pow(uLayer,0.8)*0.92,hair);
         ${vertex?'diffuseColor.rgb*=0.55+texture2D(tDetail,vAlphaMapUv*0.9).g*0.9;':''}
       #endif`)
