@@ -4,3 +4,5 @@ dist/
 # fotos privadas de Dante (referencia local, no se publican)
 dante-photos/
 .playwright-mcp/
+.vercel
+.env*
