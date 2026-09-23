@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f7c66b">
+<title>Dante 🏅</title>
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Cuidá a Dante, pastor alemán de pelo largo y campeón de El Salvador. Juego web 3D estilo Nintendogs.">
+<meta property="og:title" content="Dante 🏅">
+<meta property="og:description" content="Cuidá a Dante, pastor alemán campeón de El Salvador.">
+<meta property="og:image" content="./icons/icon-512.png">
+<link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vignette" style="position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(30,15,5,.38) 100%);z-index:1"></div>
+<div id="loading">Cargando a Dante… 🐕</div>
+<div id="hud">
+  <div class="card" id="left">
+    <div id="title" title="Logros"><span class="medal">★</span> Dante <span id="lvl" style="font-size:11px;opacity:.7;margin-left:4px"></span></div>
+    <div id="clock">🕒 --:-- El Salvador</div>
+    <div class="stats">
+      <span class="stat">🍖 Hambre</span><div class="bar"><div class="fill" id="f-hambre" style="background:var(--hambre)"></div></div>
+      <span class="stat">💧 Sed</span><div class="bar"><div class="fill" id="f-sed" style="background:var(--sed)"></div></div>
+      <span class="stat">⚡ Energía</span><div class="bar"><div class="fill" id="f-energia" style="background:var(--energia)"></div></div>
+      <span class="stat">💗 Felicidad</span><div class="bar"><div class="fill" id="f-felicidad" style="background:var(--felicidad)"></div></div>
+      <span class="stat">✨ Limpieza</span><div class="bar"><div class="fill" id="f-limpieza" style="background:var(--limpieza)"></div></div>
+    </div>
+  </div>
+  <div id="right">
+    <button class="iconbtn" id="mute" title="Sonido">🔊</button>
+    <button class="iconbtn on" id="auto" title="Reloj automático de El Salvador">🕒</button>
+    <button class="iconbtn on" id="furbtn" title="Pelo detallado">🧶</button>
+    <button class="iconbtn" id="reset" title="Reiniciar">⟲</button>
+  </div>
+</div>
+<div id="bubble"></div>
+<div id="toast"></div>
+<div id="hint"></div>
+<button id="kennelBtn">🔒 Cerrar puerta del kennel</button>
+<div id="tricks">
+  <button class="trick" data-trick="sit">🪑 Sit<span class="prog"><i></i></span></button>
+  <button class="trick" data-trick="platz">🛏️ Platz<span class="prog"><i></i></span></button>
+  <button class="trick" data-trick="paw">🐾 Pata<span class="prog"><i></i></span></button>
+  <button class="trick" data-trick="roll">🔄 Rodar<span class="prog"><i></i></span></button>
+  <button class="trick" data-trick="jump">🦘 Saltar<span class="prog"><i></i></span></button>
+  <button class="trick" data-trick="speak">📢 Habla<span class="prog"><i></i></span></button>
+  <button class="trick" data-trick="show">🏆 Show<span class="prog"><i></i></span></button>
+  <button data-trick="mango">🥭 Mango</button>
+</div>
+<div id="achv"><div class="panel">
+  <h2>🏅 Logros de Dante</h2><div class="sub" id="achvSub"></div>
+  <div class="medals" id="medals"></div>
+  <h2 style="font-size:16px">🎓 Entrenamiento</h2><div class="tr" id="training"></div>
+  <button class="close" id="achvClose">Cerrar</button>
+</div></div>
+<div id="toolbar">
+  <button class="tool active" data-tool="hand"><span class="ic">🖐️</span>Acariciar</button>
+  <button class="tool" data-action="food"><span class="ic">🍖</span>Comida</button>
+  <button class="tool" data-action="water"><span class="ic">💧</span>Agua</button>
+  <button class="tool" data-tool="ball"><span class="ic">🎾</span>Pelota</button>
+  <button class="tool" data-tool="brush"><span class="ic">🪮</span>Cepillo</button>
+  <button class="tool" data-action="tricks"><span class="ic">🎓</span>Trucos</button>
+  <button class="tool" data-action="visit"><span class="ic">🚪</span>Visita</button>
+  <button class="tool" data-action="night"><span class="ic">🌙</span>Noche</button>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

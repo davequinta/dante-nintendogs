@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.DS_Store
+# fotos privadas de Dante (referencia local, no se publican)
+dante-photos/
+.playwright-mcp/

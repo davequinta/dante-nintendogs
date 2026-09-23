@@ -1,0 +1,20 @@
+{
+  "name": "dante-nintendogs",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Juego web estilo Nintendogs protagonizado por Dante, pastor alemán de pelo largo y campeón salvadoreño.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "acorn": "^8.12.0",
+    "acorn-walk": "^8.3.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Dante",
+  "short_name": "Dante",
+  "description": "Cuidá a Dante, pastor alemán campeón de El Salvador.",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#f7c66b",
+  "theme_color": "#f7c66b",
+  "lang": "es",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
