@@ -263,43 +263,58 @@ class Dog{
   setPose(p,extra){Object.assign(this.target,basePose(),p,extra||{});}
   worldPos(local,obj){return (obj||this.head).localToWorld(this.tmp.copy(local));}
   mouthPos(){return this.worldPos(V3(0,-0.12,0.5));}
+  // resortes amortiguados: dan peso y retraso natural (la cabeza llega después que el cuerpo, la cola después que la cadera)
+  spring(name,target,dt,freq=6,zeta=0.55){ const S=this.springs[name]||(this.springs[name]={x:target,v:0}); const w=freq*2*Math.PI; const f=1+2*dt*zeta*w, hh=dt*w*w, det=1/(f+hh*dt);
+    const x=(f*S.x+dt*S.v+hh*dt*target)*det, v=(S.v+hh*(target-S.x))*det; S.x=x; S.v=v; return x; }
   animate(dt,o){ // o: {wag, mood}
-    const p=this.pose,t=this.target,k=1-Math.exp(-9*dt);
-    for(const key in p) p[key]=lerp(p[key],t[key],k);
-    this.look.yaw=damp(this.look.yaw,this.lookT.yaw,6,dt); this.look.pitch=damp(this.look.pitch,this.lookT.pitch,6,dt);
-    // marcha: caminar/trotar/galopar según velocidad
+    this.springs=this.springs||{}; const p=this.pose,t=this.target;
+    // cada parámetro de pose se acerca con su propia velocidad: el cuerpo lento y pesado, la cara rápida, y con un pequeño rebote (overshoot) al llegar
+    for(const key in p){ const heavy=key.startsWith('body')||key.endsWith('U')||key.endsWith('L'); const face=key==='eyes'||key==='mouth'||key==='tongue';
+      p[key]=this.spring('pose_'+key,t[key],dt,face?12:heavy?3.2:5.5,face?0.9:heavy?0.62:0.7); }
+    // mirada: los ojos van primero (sacada rápida), la cabeza los sigue con retraso; a veces se queda mirando y luego salta
+    this.look.yaw=this.spring('lookY',this.lookT.yaw,dt,2.2,0.7); this.look.pitch=this.spring('lookP',this.lookT.pitch,dt,2.2,0.7);
+    this.eyeLook=this.eyeLook||{y:0,p:0}; this.eyeLook.y=damp(this.eyeLook.y,this.lookT.yaw,14,dt); this.eyeLook.p=damp(this.eyeLook.p,this.lookT.pitch,14,dt);
+    // marcha: caminar/trotar/galopar según velocidad, con balanceo de peso lateral y cabeceo
     const s=this.speed, walk=clamp(s/1.2,0,1), gal=clamp((s-2.3)/2.2,0,1);
     this.gait+=dt*(3.5+s*3.4); const ph=this.gait, amp=walk*(0.5+0.35*gal);
     const offs={fl:0,fr:lerp(Math.PI,0.5,gal),rl:lerp(Math.PI,Math.PI+0.5,gal),rr:lerp(0,Math.PI,gal)};
-    const bounce=gal*0.07*Math.abs(Math.sin(ph)), gpitch=gal*0.13*Math.sin(ph);
+    const bounce=gal*0.07*Math.abs(Math.sin(ph))+walk*(1-gal)*0.012*Math.abs(Math.sin(ph)), gpitch=gal*0.13*Math.sin(ph);
+    const sway=walk*(1-gal)*0.06*Math.sin(ph), headBob=walk*0.03*Math.sin(ph*2+0.5);   // el peso pasa de un lado al otro al caminar; la cabeza cabecea al doble
     this.breath+=dt; const br=Math.sin(this.breath*(this.pant?9:1.6))*0.012;
-    this.body.position.y=0.78+p.bodyY+bounce; this.body.rotation.set(p.bodyPitch+gpitch,0,p.bodyRoll); this.body.scale.set(1,1+br,1+br*0.6);
+    // micro-movimiento permanente: nunca está totalmente quieto (ruido lento en varias frecuencias)
+    const T=this.breath; const nz=(a,b)=>Math.sin(T*a)*Math.cos(T*b+1.3);
+    this.body.position.y=0.78+p.bodyY+bounce; this.body.rotation.set(p.bodyPitch+gpitch+nz(0.7,0.4)*0.008,nz(0.5,0.9)*0.01,p.bodyRoll+sway+nz(0.6,0.3)*0.01); this.body.scale.set(1,1+br,1+br*0.6);
     const upright=Math.cos(p.bodyRoll)>0?1:-1;
     for(const n of ['fl','fr','rl','rr']){const L=this.legs[n],R=REST[n],u=p[n+'U'],l=p[n+'L'],sw=Math.sin(ph+offs[n])*amp,bend=Math.max(0,Math.sin(ph+offs[n]+1.1))*amp*1.4;
       const upR=R[0]+u-sw, knR=R[1]+l+bend; L.up.rotation.x=upR; L.up.rotation.z=(n==='fl'?1:n==='fr'?-1:0)*p.spread; L.knee.rotation.x=knR;
-      // el pie compensa para quedar plano contra el piso; al balancear la pata en el aire, cuelga un poco
       const flat=-(upR+knR)-p.bodyPitch*upright; L.paw.rotation.x=damp(L.paw.rotation.x,clamp(flat,-1.7,0.9)+Math.max(0,sw)*0.35,18,dt);}
-    this.neck.rotation.x=p.neckPitch;
-    this.head.rotation.set(p.headPitch+this.look.pitch,p.headYaw+this.look.yaw,p.headRoll);
-    // parpadeo con párpados, mirada de los ojos, orejas (con inercia al girar)
-    this.blink-=dt; if(this.blink<0){this.blinkT=0.13;this.blink=rand(2,6);} this.blinkT-=dt;
+    // cuello y cabeza con retraso respecto al cuerpo: al frenar o girar, la cabeza sigue un instante después
+    const accel=(s-(this.prevSpeed||0))/Math.max(dt,1e-3); this.prevSpeed=s; this.headLag=this.spring('headLag',clamp(-accel*0.05,-0.35,0.35),dt,2.5,0.5);
+    const turn=((this.heading-this.prevHeading+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI; this.prevHeading=this.heading; const turnRate=turn/Math.max(dt,1e-3); this.headTurnLag=this.spring('headTurnLag',clamp(-turnRate*0.12,-0.4,0.4),dt,3,0.5);
+    this.neck.rotation.x=p.neckPitch+headBob*0.5+this.headLag*0.6+nz(0.45,0.8)*0.015; this.neck.rotation.y=this.headTurnLag*0.5;
+    this.head.rotation.set(p.headPitch+this.look.pitch+headBob+this.headLag*0.5+nz(0.8,0.35)*0.02,p.headYaw+this.look.yaw+this.headTurnLag*0.5+nz(0.3,0.6)*0.02,p.headRoll+nz(0.55,0.25)*0.02);
+    // parpadeo (a veces doble) con párpados, ojos que se mueven antes que la cabeza
+    this.blink-=dt; if(this.blink<0){this.blinkT=0.12;this.blink=Math.random()<0.25?0.35:rand(2,6);} this.blinkT-=dt;
     const open=this.blinkT>0?0.05:clamp(p.eyes,0.05,1); const lidRot=lerp(-0.15,-1.0,open);
-    this.lids.forEach(l=>{l.rotation.x=damp(l.rotation.x,lidRot,30,dt);}); this.eyes.forEach(e=>{e.rotation.y=this.look.yaw*0.5;e.rotation.x=this.look.pitch*0.5;});
-    const turn=((this.heading-this.prevHeading+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI; this.prevHeading=this.heading; this.earSwing=damp(this.earSwing,-turn*6,6,dt);
+    this.lids.forEach(l=>{l.rotation.x=damp(l.rotation.x,lidRot,30,dt);}); this.eyes.forEach(e=>{e.rotation.y=this.eyeLook.y*0.6;e.rotation.x=this.eyeLook.p*0.6;});
+    // orejas: resortes flojos (se mecen con el paso y el giro), giran hacia donde mira, y a veces se mueven solas
+    this.earSwing=damp(this.earSwing,-turn*6,6,dt);
     this.twitchT-=dt; if(this.twitchT<0){this.twitchT=rand(1.5,5);this.twitch[Math.random()<.5?0:1]=0.35;}
     this.ears.forEach((e,i)=>{this.twitch[i]=Math.max(0,this.twitch[i]-dt*1.5);const sd=e.userData.side;
-      e.rotation.x=-0.1-0.25*p.earAlert+1.3*p.earBack+this.twitch[i]+bounce*3; e.rotation.z=sd*(0.42-0.2*p.earAlert+0.6*p.earBack)+this.twitch[i]*sd*0.5+clamp(this.earSwing,-0.3,0.3);});
+      const ex=-0.1-0.25*p.earAlert+1.3*p.earBack+this.twitch[i]+bounce*3+this.headLag*0.8, ez=sd*(0.42-0.2*p.earAlert+0.6*p.earBack)+this.twitch[i]*sd*0.5+clamp(this.earSwing,-0.3,0.3)+this.look.yaw*0.15*(sd>0?1:1);
+      e.rotation.x=this.spring('earX'+i,ex,dt,4.5,0.35)+nz(1.1+i*0.3,0.7)*0.02; e.rotation.z=this.spring('earZ'+i,ez,dt,4.5,0.35); e.rotation.y=this.spring('earY'+i,this.look.yaw*0.35,dt,4,0.5); });
     this.jaw.rotation.x=p.mouth*0.55; this.tongue.visible=p.tongue>0.5||(this.pant&&p.mouth<0.5&&p.eyes>0.2);
     if(this.pant&&this.tongue.visible){this.jaw.rotation.x=0.25+Math.sin(this.breath*9)*0.08;}
-    // cola: más rápida mientras más feliz
+    // cola: cadena de resortes, cada segmento sigue al anterior con retraso; meneo más rápido si está feliz, y cuelga con el peso
     const wag=o?o.wag:0.5; this.wagT+=dt*(2+wag*13); const wa=0.15+wag*0.45;
-    this.tail.forEach((sg,i)=>{sg.rotation.x=i===0?0.6+p.tailLift*1.2:0.16; sg.rotation.z=Math.sin(this.wagT-i*0.7)*wa*(i===0?1:0.55);});
+    const baseX=0.6+p.tailLift*1.2, baseZ=Math.sin(this.wagT)*wa;
+    this.tail.forEach((sg,i)=>{ const tx=i===0?baseX:0.16-Math.max(0,-p.tailLift)*0.1, tz=i===0?baseZ:Math.sin(this.wagT-i*0.7)*wa*0.55;
+      sg.rotation.x=this.spring('tailX'+i,tx+bounce*2*(i/5),dt,5-i*0.5,0.4); sg.rotation.z=this.spring('tailZ'+i,tz+clamp(this.earSwing,-0.3,0.3)*0.5*(i/5),dt,7-i*0.7,0.35); });
     this.root.rotation.y=this.heading;
-    // pelo con inercia: las capas se arrastran hacia atrás según la velocidad
+    // pelo con inercia
     this.touch.w=Math.max(0,this.touch.w-dt*1.6);
     for(const sh of this.shells){ const ud=sh.material.userData; if(ud.uDrag) ud.uDrag.value=damp(ud.uDrag.value,this.speed,4,dt); if(ud.uTouch){ ud.uTouch.value.set(this.touch.pos.x,this.touch.pos.y,this.touch.pos.z,this.touch.w); ud.uTouchDir.value.copy(this.touch.dir); } }
     { const u=this.fins.material.userData.uDrag; if(u) u.value=damp(u.value,this.speed,4,dt); }
-    // sombra de contacto: se achica y aclara cuando salta
     const lift=clamp(p.bodyY,0,1); this.blob.scale.setScalar(1-lift*0.4); this.blob.material.opacity=1-lift*0.8;
   }
 }

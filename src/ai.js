@@ -49,7 +49,7 @@ function toast(msg,dur=2.4){ toastEl.textContent=msg; toastEl.classList.add('sho
 function updateToast(dt){ toastT-=dt; if(toastT<0) toastEl.classList.remove('show'); }
 
 // ---------- DOG AI (máquina de estados)
-const FREE=new Set(['stand','sit','lie','wander','scratch','yawn','fly','fetch_done','pet','bellyup','trick','kiara','groom','shake','jealous','peace']);
+const FREE=new Set(['stand','sit','lie','wander','scratch','yawn','fly','fetch_done','pet','bellyup','trick','kiara','groom','shake','jealous','peace','sniff','lookaround']);
 const ai={state:'stand',t:0,dur:2,target:V3(),petting:false,petZone:null,petT:0,calm:0,cryT:0,barkT:0,sayT:6,chompT:0,spun:0,trick:null,obeys:true,disobey:null,snoreT:0,wakeT:0,afterPet:0};
 const visit={active:false,t:0,phase:'none'};
 const kiaraAI={active:false,state:'away',t:0,next:rand(35,60),target:V3(),dur:0,scoldCd:0,stay:0};
@@ -73,6 +73,8 @@ const steer=(dt,target,maxSpeed,stop)=>steerDog(dante,dt,target,maxSpeed,stop);
 function stopMoving(dt){ dante.speed=damp(dante.speed,0,8,dt); }
 function chooseIdle(){
   const r=Math.random(), tired=stats.energia<35;
+  if(r<0.1) return setState('sniff',{dur:rand(2.5,4.5)});
+  if(r<0.18) return setState('lookaround',{dur:rand(3,5)});
   if(tired&&r<0.5) return setState('lie',{dur:rand(6,12)});
   if(r<0.22) return setState('wander',{target:V3(rand(-B+1,B-1),0,rand(-B+1,B-1))});
   if(r<0.42) return setState('sit',{dur:rand(4,8)});
@@ -91,7 +93,8 @@ function onEnter(s){
     case 'scratch': D.setPose(POSES.scratch); break;
     case 'yawn': D.setPose(POSES.sit,{mouth:1,eyes:0.1,neckPitch:-0.45}); say('tired',1.8); break;
     case 'fly': D.setPose(POSES.alert,{mouth:0.2}); say('fly'); break;
-    case 'goto_eat': case 'goto_drink': case 'to_gate': case 'to_kennel': case 'to_player': case 'fetch_chase': D.setPose(POSES.stand); break;
+    case 'goto_eat': case 'goto_drink': case 'to_kennel': case 'to_player': D.setPose(POSES.stand); break;
+    case 'to_gate': case 'fetch_chase': D.setPose(POSES.stand,{bodyY:-0.1,rlU:-0.25,rrU:-0.25,earAlert:1}); setTimeout(()=>{ if(ai.state==='fetch_chase'||ai.state==='to_gate') D.setPose(POSES.stand,{earAlert:1,mouth:0.5,tailLift:0.6}); },180); break;
     case 'eat': D.setPose(POSES.eat); say('eat'); break;
     case 'drink': D.setPose(POSES.eat,{mouth:0.2}); say('drink'); break;
     case 'fetch_return': D.setPose(POSES.stand,{mouth:0.4,tailLift:0.7}); say('fetch'); break;
@@ -123,6 +126,8 @@ function onEnter(s){
     case 'groom': D.setPose(POSES.stand,{eyes:0.35,neckPitch:-0.1}); achv.brushes++; break;
     case 'eat_mango': D.setPose(POSES.sit,{neckPitch:-0.3,mouth:0.6}); say('mango',2.6,true); D.pant=false; break;
     case 'shake': D.setPose(POSES.stand,{earBack:0.4,eyes:0.3}); say('shake',1.8,true); ai.shakeT=1.4; Audio.sigh(); break;
+    case 'sniff': D.setPose(POSES.stand,{neckPitch:0.9,headPitch:0.3,earAlert:0.3,tailLift:0.3}); ai.sniffT=0; break;
+    case 'lookaround': D.setPose(POSES.stand,{earAlert:0.8,tailLift:0.35}); ai.lookNext=0; break;
     case 'tug': D.setPose(POSES.stand,{mouth:0.55,neckPitch:0.35,earBack:0.5,tailLift:0.6,rlU:0.2,rrU:0.2,bodyPitch:0.15}); say('tug',2,true); ai.tugPull=0; ai.tugWin=0; Audio.growl(); break;
     case 'jealous': D.setPose(POSES.sit,{earBack:0.6,eyes:0.7,neckPitch:-0.1}); say('kiaraJealous',2.4,true); break;
     case 'peace': D.setPose(POSES.lie,{neckPitch:0.2,eyes:0.7}); say('kiaraPeace',2.4,true); break;
@@ -146,7 +151,7 @@ function updateAI(dt){
   if((ai.state==='stand'||ai.state==='sit'||ai.state==='wander')&&!ai.petting&&Math.random()<dt*0.4){ const f=flies[0]; if(f.position.distanceTo(p)<2.2) setState('fly',{dur:2.6}); }
   // mirar al cursor cuando está tranquilo
   const lookStates=new Set(['stand','sit','lie','wander','fetch_done','groom','trick','calm']);
-  if(lookStates.has(ai.state)&&cursor.has&&ai.state!=='wander') lookAtPoint(cursor.world,dt); else if(ai.state!=='fly'&&ai.state!=='kiara'&&ai.state!=='bark'&&ai.state!=='pet'){D.lookT.yaw=0;D.lookT.pitch=0;}
+  ai.gazeT=(ai.gazeT||0)-dt; if(lookStates.has(ai.state)&&cursor.has&&ai.state!=='wander'&&ai.state!=='lookaround'){ if(ai.gazeT<=0){ lookAtPoint(cursor.world,dt); ai.gazeT=rand(0.25,1.1); } } else if(ai.state!=='fly'&&ai.state!=='kiara'&&ai.state!=='bark'&&ai.state!=='pet'&&ai.state!=='lookaround'){D.lookT.yaw=0;D.lookT.pitch=0;}
 
   switch(ai.state){
     case 'stand': case 'sit': case 'lie': case 'scratch': case 'yawn': stopMoving(dt);
@@ -223,6 +228,12 @@ function updateAI(dt){
       if(ai.tugWin>=3){ addStat('felicidad',10); addStat('energia',-6); achv.tugs++; diary('Jugó a la soga y ganó'); say('¡gané!',1.8,true); Audio.yip(); rope.visible=false; setState('fetch_done',{dur:2.5}); }
       else if(ai.t>25){ rope.visible=false; chooseIdle(); } break; }
     case 'jealous': stopMoving(dt); lookAtPoint(kiara.root.position,dt,1.2); if(ai.t>3.5) chooseIdle(); break;
+    case 'sniff': { // olfatea el piso avanzando despacio en zigzag, con la nariz temblando
+      const zig=Math.sin(ai.t*1.6)*0.5; dante.heading+=zig*dt; dante.speed=damp(dante.speed,0.35,3,dt); p.x=clamp(p.x+Math.sin(dante.heading)*dante.speed*dt,-B,B); p.z=clamp(p.z+Math.cos(dante.heading)*dante.speed*dt,-B,B);
+      D.target.headYaw=Math.sin(ai.t*2.3)*0.35; D.target.neckPitch=0.9+Math.sin(ai.t*9)*0.04; ai.sniffT-=dt; if(ai.sniffT<0){ ai.sniffT=rand(0.15,0.35); Audio.pant(); }
+      if(ai.t>ai.dur) chooseIdle(); break; }
+    case 'lookaround': { stopMoving(dt); ai.lookNext-=dt; if(ai.lookNext<=0){ ai.lookNext=rand(0.7,1.6); D.lookT.yaw=rand(-0.9,0.9); D.lookT.pitch=rand(-0.15,0.25); }
+      if(ai.t>ai.dur) chooseIdle(); break; }
     case 'peace': stopMoving(dt); if(Math.random()<dt*0.15) Audio.sigh(); if(ai.t>ai.dur||!kiaraAI.active) chooseIdle(); break;
   }
   // mojado: sube limpieza mientras cae agua, y cuando termina se sacude
