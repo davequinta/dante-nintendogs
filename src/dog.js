@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { edgeTable, triTable } from 'three/addons/objects/MarchingCubes.js';
 import { clamp, lerp, damp, rand, V3 } from './utils.js';
-import { scene, MOBILE, FUR_LAYERS, furMaterial, canvasTex } from './scene.js';
+import { scene, MOBILE, FUR_LAYERS, furMaterial, finMaterial, canvasTex, SKIN_TEX, FUR_TEX } from './scene.js';
 
 // ---------- DOG MODEL
 // El perro es UNA malla orgánica generada en código: el esqueleto (huesos de three) lleva "primitivas" de
@@ -55,7 +55,7 @@ class Dog{
     // ---- esqueleto: mismos nombres y pivotes que la versión anterior, más un hueso de pie por pata
     const bone=(name,parent,pos,rx=0)=>{const b=new THREE.Bone();b.name=name;b.position.set(...pos);b.rotation.x=rx;parent.add(b);this.bones.push(b);return b;};
     this.bones=[]; this.prims=[];
-    this.mesh=new THREE.SkinnedMesh(new THREE.BufferGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.9})); this.root.add(this.mesh);
+    this.mesh=new THREE.SkinnedMesh(new THREE.BufferGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,map:SKIN_TEX,bumpMap:FUR_TEX,bumpScale:0.004,roughness:0.9})); this.root.add(this.mesh);
     this.body=bone('body',this.mesh,[0,0.78,0]);
     this.neck=bone('neck',this.body,[0,0.14,0.44]); this.head=bone('head',this.neck,[0,0.38,0.30]); this.jaw=bone('jaw',this.head,[0,-0.1,0.13]);
     this.ears=[1,-1].map(s=>{const e=bone('ear'+s,this.head,[0.17*s,0.15,-0.05]);e.userData.side=s;return e;});
@@ -101,7 +101,7 @@ class Dog{
     const mkMesh=(geo,mat,parent,pos,scl,rot)=>{const m=new THREE.Mesh(geo,mat);m.position.set(...pos);m.scale.set(...scl);if(rot)m.rotation.set(...rot);m.castShadow=true;m.userData.zone='head';parent.add(m);return m;};
     const sphG=new THREE.SphereGeometry(1,20,14), lidG=new THREE.SphereGeometry(1,20,10,0,Math.PI*2,0,Math.PI*0.55);
     const mSclera=new THREE.MeshPhysicalMaterial({color:0x9c8a78,roughness:0.2,clearcoat:1,clearcoatRoughness:0.05}),mIris=new THREE.MeshPhysicalMaterial({color:0x5a2e0e,roughness:0.15,clearcoat:1,clearcoatRoughness:0.03}),mPupil=new THREE.MeshPhysicalMaterial({color:0x050302,roughness:0.1,clearcoat:1});
-    const mLid=new THREE.MeshStandardMaterial({color:colors.mask,roughness:0.95}), mN=new THREE.MeshPhysicalMaterial({color:colors.nose,roughness:0.28,clearcoat:0.8,clearcoatRoughness:0.25}),mNostril=new THREE.MeshStandardMaterial({color:0x000000,roughness:1});
+    const mLid=new THREE.MeshStandardMaterial({color:colors.mask,roughness:0.95}), mN=new THREE.MeshPhysicalMaterial({color:colors.nose,roughness:0.45,clearcoat:0.5,clearcoatRoughness:0.35,bumpMap:FUR_TEX,bumpScale:0.002}),mNostril=new THREE.MeshStandardMaterial({color:0x000000,roughness:1});
     const mTongue=new THREE.MeshPhysicalMaterial({color:0xd8607a,roughness:0.35,clearcoat:0.7}),mMouth=new THREE.MeshStandardMaterial({color:0x2a0e0c,roughness:1}),mTooth=new THREE.MeshPhysicalMaterial({color:0xf2ecdc,roughness:0.3,clearcoat:0.5});
     this.meshes=[this.mesh]; this.lids=[];
     this.eyes=[0.1,-0.1].map(x=>{const e=new THREE.Group();e.position.set(x,0.05,0.215);this.head.add(e);
@@ -109,7 +109,7 @@ class Dog{
       w.castShadow=ir.castShadow=p.castShadow=false; this.meshes.push(w,ir);
       const lid=mkMesh(lidG,mLid,e,[0,0,0],[0.056,0.05,0.05]); lid.castShadow=false; lid.rotation.x=-1.5; this.lids.push(lid);   // párpado superior: rota para cerrar
       return e;});
-    this.meshes.push(mkMesh(sphG,mN,this.head,[0,0.03,0.545],[0.058,0.048,0.052]));
+    this.meshes.push(mkMesh(sphG,mN,this.head,[0,0.03,0.545],[0.05,0.042,0.046]));
     [0.02,-0.02].forEach(x=>mkMesh(sphG,mNostril,this.head,[x,0.025,0.595],[0.012,0.014,0.008]).castShadow=false);
     mkMesh(sphG,mMouth,this.head,[0,-0.09,0.3],[0.1,0.045,0.24]).castShadow=false;
     const toothG=new THREE.ConeGeometry(1,1,8);
@@ -118,7 +118,7 @@ class Dog{
     // sombra de contacto suave bajo el cuerpo
     this.blob=new THREE.Mesh(new THREE.PlaneGeometry(1.7,1.1),new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false})); this.blob.rotation.x=-Math.PI/2; this.blob.position.y=0.006; this.blob.renderOrder=-1; this.root.add(this.blob);
     // ---- construir la piel
-    const t0=performance.now(); this.buildSkin(); this.buildFur(); this.genMs=Math.round(performance.now()-t0);
+    const t0=performance.now(); this.buildSkin(); this.buildFur(); this.buildFins(); this.genMs=Math.round(performance.now()-t0);
     this.pose=basePose(); this.target=basePose();
     this.speed=0; this.heading=0; this.gait=0; this.look={yaw:0,pitch:0}; this.lookT={yaw:0,pitch:0};
     this.blink=rand(2,5); this.blinkT=0; this.breath=rand(0,6); this.wagT=0; this.twitch=[0,0]; this.twitchT=rand(1,4);
@@ -191,7 +191,21 @@ class Dog{
   }
   buildFur(){ this.shells=[]; const L=this.longHair?FUR_LAYERS:Math.max(3,FUR_LAYERS>>1);
     for(let i=1;i<=L;i++){ const sh=new THREE.SkinnedMesh(this.mesh.geometry,furMaterial(0xffffff,1,i,L,{vertex:true,id:this.id})); sh.bind(this.skeleton,this.mesh.bindMatrix); sh.castShadow=false; sh.receiveShadow=false; sh.frustumCulled=false; sh.raycast=()=>{}; this.root.add(sh); this.shells.push(sh); } }
-  setFur(on){ for(const sh of this.shells) sh.visible=on; }
+  // "fins": una tira de hebras por cada tantos vértices, perpendicular a la piel; el shader la muestra solo de canto (silueta)
+  buildFins(){ const g=this.mesh.geometry, P=g.attributes.position.array, N=g.attributes.normal.array, Cc=g.attributes.color.array, F=g.attributes.furLen.array, SI=g.attributes.skinIndex.array, SW=g.attributes.skinWeight.array;
+    const nv=P.length/3, step=MOBILE?6:3, flow=V3(0,-0.35,-1).normalize(), t=V3(), n=V3(), p=V3(); const pos=[],nrm=[],col=[],uv=[],si=[],sw=[],fl=[],idx=[];
+    for(let v=0;v<nv;v+=step){ const len=F[v]; if(len<0.03||Math.random()<0.45) continue;
+      n.set(N[v*3],N[v*3+1],N[v*3+2]); p.set(P[v*3],P[v*3+1],P[v*3+2]);
+      t.crossVectors(n,flow); if(t.lengthSq()<1e-4) t.set(1,0,0); t.normalize().applyAxisAngle(n,rand(-0.7,0.7));
+      const w=rand(0.014,0.03)*clamp(len/0.06+0.4,0.5,1.2), L=Math.min(0.085,len*rand(0.8,1.25)), tx=n.x*L+flow.x*L*0.4, ty=n.y*L+flow.y*L*0.4, tz=n.z*L+flow.z*L*0.4, u0=Math.random();
+      const base=pos.length/3;
+      pos.push(p.x-t.x*w,p.y-t.y*w,p.z-t.z*w, p.x+t.x*w,p.y+t.y*w,p.z+t.z*w, p.x-t.x*w+tx,p.y-t.y*w+ty,p.z-t.z*w+tz, p.x+t.x*w+tx,p.y+t.y*w+ty,p.z+t.z*w+tz);
+      for(let k=0;k<4;k++){ nrm.push(n.x,n.y,n.z); col.push(Cc[v*3],Cc[v*3+1],Cc[v*3+2]); for(let j=0;j<4;j++){ si.push(SI[v*4+j]); sw.push(SW[v*4+j]); } fl.push(L); }
+      uv.push(u0,0, u0+0.18,0, u0,1, u0+0.18,1); idx.push(base,base+1,base+2, base+1,base+3,base+2); }
+    const fg=new THREE.BufferGeometry(); fg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); fg.setAttribute('normal',new THREE.Float32BufferAttribute(nrm,3)); fg.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+    fg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); fg.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(si,4)); fg.setAttribute('skinWeight',new THREE.Float32BufferAttribute(sw,4)); fg.setAttribute('finLen',new THREE.Float32BufferAttribute(fl,1)); fg.setIndex(idx);
+    this.fins=new THREE.SkinnedMesh(fg,finMaterial(this.id)); this.fins.bind(this.skeleton,this.mesh.bindMatrix); this.fins.castShadow=false; this.fins.frustumCulled=false; this.fins.raycast=()=>{}; this.root.add(this.fins); this.stats.fins=idx.length/6; }
+  setFur(on){ for(const sh of this.shells) sh.visible=on; if(this.fins) this.fins.visible=on; }
   setDirty(on){ if(this.dirty===on)return; this.dirty=on; const a=this.mesh.geometry.attributes.color; a.array.set(on?this.dirtyColor:this.cleanColor); a.needsUpdate=true; }
   zoneAt(hit){ if(hit.object.userData.zone) return hit.object.userData.zone; if(hit.object===this.mesh&&hit.face) return ZONES[this.zoneAttr[hit.face.a]]; return 'body'; }
   setPose(p,extra){Object.assign(this.target,basePose(),p,extra||{});}
@@ -231,6 +245,7 @@ class Dog{
     this.root.rotation.y=this.heading;
     // pelo con inercia: las capas se arrastran hacia atrás según la velocidad
     for(const sh of this.shells){ const u=sh.material.userData.uDrag; if(u) u.value=damp(u.value,this.speed,4,dt); }
+    { const u=this.fins.material.userData.uDrag; if(u) u.value=damp(u.value,this.speed,4,dt); }
     // sombra de contacto: se achica y aclara cuando salta
     const lift=clamp(p.bodyY,0,1); this.blob.scale.setScalar(1-lift*0.4); this.blob.material.opacity=1-lift*0.8;
   }

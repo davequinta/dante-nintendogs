@@ -2,8 +2,12 @@ import * as THREE from 'three';
 import { clamp, lerp, damp, $, V3, B, KENNEL_POS, KENNEL_DIR } from './utils.js';
 import { Audio } from './audio.js';
 import { Save, stats, DECAY, world, TRICKS, training, achv, addStat } from './state.js';
-import { canvas, renderer, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, skyUniforms, rebuildEnv, kennelDoor, kennelDoorMeshes, kibble, waterMesh, clouds, ball, previewDots, Particles } from './scene.js';
+import { MOBILE, canvas, renderer, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, skyUniforms, rebuildEnv, kennelDoor, kennelDoorMeshes, kibble, waterMesh, clouds, ball, previewDots, Particles } from './scene.js';
 import { POSES, dante, kiara } from './dog.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { bubble, say, toast, updateToast, FREE, ai, visit, kiaraAI, setState, cursor, updateAI, cmdFood, cmdWater, cmdTrick, cmdVisit, setNight, cmdNight, toggleKennelDoor, updateKennelBtn, updateVisit, kSet, updateKiara, updateFlies, updateBall } from './ai.js';
 
 // ---------- INTERACTIONS (raycaster, herramientas, lanzamiento)
@@ -136,7 +140,12 @@ let saveT=5; function persist(){ Save.write(snapshot()); }
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) persist(); }); addEventListener('pagehide',persist);
 
 // ---------- LOOP
-function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+// oclusión ambiental en pantalla (GTAO) solo en escritorio: asienta al perro y a los objetos en el patio
+let composer=null, aoPass=null;
+if(!MOBILE){ composer=new EffectComposer(renderer); composer.setPixelRatio(renderer.getPixelRatio()); composer.addPass(new RenderPass(scene,camera));
+  aoPass=new GTAOPass(scene,camera,innerWidth,innerHeight); aoPass.output=GTAOPass.OUTPUT.Default; aoPass.blendIntensity=0.85;
+  aoPass.updateGtaoMaterial({radius:0.3,distanceExponent:1,thickness:1,scale:1,samples:12,distanceFallOff:1,screenSpaceRadius:false}); composer.addPass(aoPass); composer.addPass(new OutputPass()); }
+function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); if(composer){ composer.setSize(w,h); } }
 addEventListener('resize',resize); resize();
 const clock=new THREE.Clock(); let hudT=0, medalT=6; const camDelta=V3(), camGoal=V3();
 function frame(){ requestAnimationFrame(frame); const dt=Math.min(clock.getDelta(),0.05); world.time+=dt; TIME.value=world.time;
@@ -153,7 +162,7 @@ function frame(){ requestAnimationFrame(frame); const dt=Math.min(clock.getDelta
   hudT-=dt; if(hudT<0){ hudT=0.2; updateHUD(); } updateBubble(dt);
   updateToast(dt);
   saveT-=dt; if(saveT<0){ saveT=6; persist(); }
-  renderer.render(scene,camera);
+  if(composer) composer.render(); else renderer.render(scene,camera);
 }
 updateHUD(); frame(); $('#loading').classList.add('hide');
 window.__dante={dante,kiara,ai,setState,POSES,stats,world,camera,controls,cmdNight,setNight,cmdVisit,cmdFood,cmdWater,cmdTrick,ball,kiaraAI,kSet,doThrow,visit,training,achv,toggleKennelDoor,checkMedals};

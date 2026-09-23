@@ -129,6 +129,24 @@ const FUR_TEX=(()=>{const c=document.createElement('canvas');c.width=c.height=25
   g.lineCap='round'; for(let i=0;i<7000;i++){const v=Math.floor(20+Math.random()*235);g.strokeStyle=`rgb(${v},${v},${v})`;g.lineWidth=rand(0.7,1.6);const x=Math.random()*256,y=Math.random()*256,a=rand(-0.45,0.45),l=rand(6,16);g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.sin(a)*l,y+Math.cos(a)*l);g.stroke();}
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(7,7);t.anisotropy=4;return t;})();
 const FUR_LAYERS=MOBILE?5:10;
+// hebras sueltas para las "fins" de la silueta: tiras verticales con alpha, sobre fondo transparente
+const FIN_TEX=(()=>{const c=document.createElement('canvas');c.width=512;c.height=128;const g=c.getContext('2d');g.lineCap='round';
+  for(let i=0;i<420;i++){const v=Math.floor(140+Math.random()*115);g.strokeStyle=`rgba(${v},${v},${v},${rand(0.7,1)})`;g.lineWidth=rand(0.6,1.5);const x=rand(0,512),top=rand(0,55),bend=rand(-14,14);g.beginPath();g.moveTo(x,128);g.quadraticCurveTo(x+bend*0.5,64+top*0.5,x+bend,top);g.stroke();}
+  const t=new THREE.CanvasTexture(c);t.wrapS=THREE.RepeatWrapping;t.wrapT=THREE.ClampToEdgeWrapping;t.anisotropy=4;return t;})();
+// piel bajo el pelo: moteado suave para que el color no sea plano donde el pelo es corto
+const SKIN_TEX=canvasTex(256,256,(g,w,h)=>{g.fillStyle='#e8e8e8';g.fillRect(0,0,w,h);for(let i=0;i<2600;i++){const v=Math.floor(200+Math.random()*55);g.fillStyle=`rgba(${v},${v},${v},0.5)`;g.beginPath();g.arc(Math.random()*w,Math.random()*h,rand(2,9),0,Math.PI*2);g.fill();}},[4,4]);
+const finMatCache={};
+function finMaterial(id){ if(finMatCache[id])return finMatCache[id];
+  const m=new THREE.MeshStandardMaterial({map:FIN_TEX,alphaTest:0.3,side:THREE.DoubleSide,vertexColors:true,roughness:0.9});
+  m.onBeforeCompile=sh=>{ sh.uniforms.uTime=TIME; sh.uniforms.uDrag={value:0}; m.userData.uDrag=sh.uniforms.uDrag;
+    sh.vertexShader='uniform float uTime,uDrag; attribute float finLen; varying float vEdge;\n'+sh.vertexShader
+      .replace('#include <skinning_vertex>',`#include <skinning_vertex>
+        transformed+=(vec3(sin(uTime*2.3+position.x*9.0),0.0,cos(uTime*1.9+position.z*7.0))*0.22+vec3(0.0,-0.15,-0.35*uDrag))*uv.y*finLen;`)
+      .replace('#include <project_vertex>',`#include <project_vertex>
+        vEdge=1.0-abs(dot(normalize(transformedNormal),normalize(-mvPosition.xyz)));`);
+    sh.fragmentShader='varying float vEdge;\n'+sh.fragmentShader.replace('#include <alphatest_fragment>',`diffuseColor.a*=smoothstep(0.5,0.85,vEdge); diffuseColor.rgb*=mix(0.75,1.2,vMapUv.y);
+        #include <alphatest_fragment>`); };
+  finMatCache[id]=m; return m; }
 const furMatCache={};
 // material de una capa de pelo: desplaza la malla a lo largo de la normal, cae con "gravedad", se mece, y oscurece la raíz (oclusión)
 function furMaterial(color,len,layer,layers,opts={}){ const vertex=!!opts.vertex; const key=color+'_'+len+'_'+layer+'_'+(vertex?'v':'s')+'_'+(opts.id||''); if(furMatCache[key])return furMatCache[key];
@@ -213,4 +231,4 @@ const Particles=(()=>{
   return {spawn,update};
 })();
 
-export { canvas, renderer, MOBILE, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, M, G, noiseCanvas, bumpTex, skyUniforms, skyMat, skyDome, pmrem, rebuildEnv, mesh, canvasTex, grassTex, grassBump, tileDraw, tileTex, tileBump, tileMat, ground, terrace, walkway, grassBlades, stuccoBump, brickTex, wallMat, wallMat2, brickMat, walls, gate, barMat, kennel, kennelDoor, kennelDoorMeshes, KIARA_BED, HOUSE_DOOR, FUR_TEX, FUR_LAYERS, furMatCache, furMaterial, bowls, kibbleMat, waterMat, bowl, foodBowl, waterBowl, kibble, waterMesh, leafBump, potMat, leafMat, leafMat2, foliage, pot, sunBall, clouds, stars, visitor, flies, relocateFly, ballTex, ball, previewDots, Particles };
+export { FIN_TEX, SKIN_TEX, finMaterial, canvas, renderer, MOBILE, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, M, G, noiseCanvas, bumpTex, skyUniforms, skyMat, skyDome, pmrem, rebuildEnv, mesh, canvasTex, grassTex, grassBump, tileDraw, tileTex, tileBump, tileMat, ground, terrace, walkway, grassBlades, stuccoBump, brickTex, wallMat, wallMat2, brickMat, walls, gate, barMat, kennel, kennelDoor, kennelDoorMeshes, KIARA_BED, HOUSE_DOOR, FUR_TEX, FUR_LAYERS, furMatCache, furMaterial, bowls, kibbleMat, waterMat, bowl, foodBowl, waterBowl, kibble, waterMesh, leafBump, potMat, leafMat, leafMat2, foliage, pot, sunBall, clouds, stars, visitor, flies, relocateFly, ballTex, ball, previewDots, Particles };
