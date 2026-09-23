@@ -25,7 +25,7 @@ POSES.cry={...POSES.lie,neckPitch:0.3,eyes:0.45,earBack:1,mouth:0.25};
 POSES.paw={...POSES.sit,flU:-1.15,flL:0.95,headRoll:0.15};
 POSES.scratch={...POSES.sit,rrU:-1.1,rrL:0.9,neckPitch:0.5,headYaw:0.6,headRoll:0.4,eyes:0.4};
 
-const DANTE_COLORS={base:0xb35e26,light:0xcf8340,saddle:0x1d1a1a,mask:0x1a1717,fur:0xd8964e,nose:0x121010};
+const DANTE_COLORS={base:0xa24d1c,light:0xc4763a,saddle:0x1b1613,mask:0x14110f,fur:0xc98844,nose:0x121010};
 const KIARA_COLORS={base:0xc9a266,light:0xdcb87c,saddle:0x8a6a3c,mask:0x3a2c22,fur:0xe6d2a2,nose:0x121010};
 
 const ZONES=['body','head','belly','tail'];
@@ -66,41 +66,42 @@ class Dog{
     const P=(type,b,pos,scl,col,len,zone='body',rot=null)=>this.prims.push({type,bone:b,pos,scl,rot,color:new THREE.Color(col),len,zone:ZONES.indexOf(zone)});
     const lh=this.longHair;
     // tronco: cruz alta, lomo que baja hacia la grupa, pecho profundo y vientre recogido
-    P('sph',this.body,[0,0.06,0.1],[0.27,0.30,0.5],C.B,0.055);            // caja torácica
-    P('sph',this.body,[0,-0.1,0.45],[0.25,0.32,0.3],C.B,0.055);            // pecho profundo
-    P('sph',this.body,[0,0.02,-0.32],[0.22,0.25,0.3],C.B,0.055);           // lomo (más angosto: tuck-up)
-    P('sph',this.body,[0,-0.06,-0.55],[0.23,0.24,0.32],C.B,0.055);         // grupa
-    P('sph',this.body,[0,0.19,0.32],[0.24,0.2,0.26],C.S,0.065);            // cruz
-    P('sph',this.body,[0,0.14,-0.12],[0.26,0.2,0.5],C.S,0.065);            // manto
-    P('sph',this.body,[0,0.05,-0.56],[0.2,0.16,0.28],C.S,0.065);           // manto sobre la grupa (más bajo)
+    P('sph',this.body,[0,0.06,0.1],[0.27,0.30,0.5],C.B,0.07);             // caja torácica
+    P('sph',this.body,[0,-0.1,0.45],[0.25,0.32,0.3],C.B,0.07);             // pecho profundo
+    P('sph',this.body,[0,0.02,-0.32],[0.22,0.25,0.3],C.B,0.07);            // lomo (más angosto: tuck-up)
+    P('sph',this.body,[0,-0.06,-0.55],[0.23,0.24,0.32],C.B,0.07);          // grupa
+    P('sph',this.body,[0,0.17,0.32],[0.27,0.22,0.28],C.S,0.08);            // cruz
+    P('sph',this.body,[0,0.1,-0.12],[0.29,0.24,0.52],C.S,0.08);            // manto (baja por los flancos)
+    P('sph',this.body,[0,0.03,-0.56],[0.23,0.18,0.3],C.S,0.08);            // manto sobre la grupa (más bajo)
     P('sph',this.body,[0,-0.2,0.15],[0.22,0.14,0.42],C.L,0.10,'belly');    // vientre
     P('sph',this.body,[0,-0.1,-0.3],[0.17,0.11,0.24],C.L,0.10,'belly');    // vientre recogido
-    P('sph',this.body,[0,-0.1,0.62],[0.15,0.17,0.13],C.F,0.13);            // antepecho
-    if(lh){ P('sph',this.body,[0,-0.18,0.52],[0.22,0.2,0.14],C.F,0.14); P('sph',this.body,[0.18,0.0,0.46],[0.11,0.16,0.1],C.B,0.13); P('sph',this.body,[-0.18,0.0,0.46],[0.11,0.16,0.1],C.B,0.13); }
-    P('cyl',this.neck,[0,0.17,0.13],[0.15,0.56,0.16],C.B,0.06,'body',[0.62,0,0]); if(lh) P('cyl',this.neck,[0,0.21,0.07],[0.12,0.42,0.11],C.S,0.07,'body',[0.62,0,0]);
+    P('sph',this.body,[0,-0.1,0.62],[0.16,0.19,0.13],C.F,0.15);            // antepecho
+    if(lh){ P('sph',this.body,[0,-0.18,0.52],[0.25,0.24,0.16],C.F,0.17); P('sph',this.body,[0.19,0.0,0.46],[0.12,0.17,0.11],C.L,0.15); P('sph',this.body,[-0.19,0.0,0.46],[0.12,0.17,0.11],C.L,0.15); }
+    P('cyl',this.neck,[0,0.17,0.13],[0.15,0.56,0.16],C.B,0.07,'body',[0.62,0,0]); if(lh){ P('cyl',this.neck,[0,0.22,0.06],[0.13,0.44,0.11],C.S,0.08,'body',[0.62,0,0]); P('sph',this.neck,[0.14,0.14,0.16],[0.1,0.2,0.13],C.L,0.16,'body'); P('sph',this.neck,[-0.14,0.14,0.16],[0.1,0.2,0.13],C.L,0.16,'body'); }
     // cabeza en cuña: cráneo, frente con "stop", hocico más largo y angosto, cachetes, cejas
-    P('sph',this.head,[0,0,0],[0.22,0.2,0.24],C.B,0.022,'head'); P('sph',this.head,[0,0.08,-0.02],[0.19,0.14,0.2],C.S,0.02,'head');
-    P('sph',this.head,[0,0.05,0.1],[0.17,0.13,0.14],C.B,0.02,'head');       // frente
+    P('sph',this.head,[0,0,0],[0.22,0.2,0.24],C.B,0.025,'head'); P('sph',this.head,[0,0.075,0.0],[0.21,0.16,0.24],C.S,0.028,'head');
+    P('sph',this.head,[0,0.05,0.1],[0.17,0.13,0.15],C.S,0.02,'head');       // frente (negra)
+    P('sph',this.head,[0,0.02,0.17],[0.18,0.09,0.13],C.K,0.012,'head');    // máscara alrededor de los ojos
     P('sph',this.head,[0,-0.02,0.27],[0.125,0.095,0.29],C.K,0.012,'head');  // hocico
     P('sph',this.head,[0,-0.005,0.47],[0.085,0.075,0.085],C.K,0.008,'head');// punta del hocico
-    P('sph',this.head,[0.155,-0.05,0.1],[0.1,0.09,0.11],C.L,0.03,'head'); P('sph',this.head,[-0.155,-0.05,0.1],[0.1,0.09,0.11],C.L,0.03,'head');
-    P('sph',this.head,[0.085,0.1,0.18],[0.04,0.025,0.035],C.L,0.012,'head'); P('sph',this.head,[-0.085,0.1,0.18],[0.04,0.025,0.035],C.L,0.012,'head');
+    P('sph',this.head,[0.165,-0.06,0.07],[0.11,0.11,0.13],C.B,0.06,'head'); P('sph',this.head,[-0.165,-0.06,0.07],[0.11,0.11,0.13],C.B,0.06,'head');   // cachetes peludos
+    P('sph',this.head,[0.09,0.105,0.185],[0.045,0.028,0.038],C.L,0.012,'head'); P('sph',this.head,[-0.09,0.105,0.185],[0.045,0.028,0.038],C.L,0.012,'head');   // cejas fuego
     P('cut',this.head,[0,-0.1,0.36],[0.24,0.05,0.4],0,0,'head');           // ranura de la boca
     P('cutsph',this.head,[0.1,0.05,0.215],[0.064,0.056,0.066],0,0,'head'); P('cutsph',this.head,[-0.1,0.05,0.215],[0.064,0.056,0.066],0,0,'head'); // cuencas
     P('sph',this.jaw,[0,-0.04,0.13],[0.082,0.048,0.22],C.K,0.008,'head');
-    for(const e of this.ears){ P('sph',e,[0,0.2,0],[0.095,0.23,0.04],C.S,0.025,'head'); P('sph',e,[0,0.19,0.02],[0.07,0.18,0.03],C.L,0.012,'head'); }
+    for(const e of this.ears){ P('sph',e,[0,0.2,-0.005],[0.11,0.25,0.045],C.S,0.03,'head'); P('sph',e,[0,0.18,0.025],[0.085,0.2,0.03],C.L,0.045,'head'); P('sph',e,[0,0.02,0.02],[0.09,0.07,0.07],C.L,0.08,'head'); }
     // patas: brazo/muslo, articulación, antebrazo/pierna, y pie con dedos
     for(const n of ['fl','fr','rl','rr']){ const L=this.legs[n], rear=L.rear;
-      if(rear){ P('cyl',L.up,[0,-0.19,0],[0.1,0.38,0.11],C.B,0.03); P('sph',L.up,[0,-0.02,-0.03],[0.12,0.2,0.15],C.S,0.065); if(lh) P('sph',L.up,[0,-0.2,-0.09],[0.1,0.17,0.1],C.B,0.13);
+      if(rear){ P('cyl',L.up,[0,-0.19,0],[0.1,0.38,0.11],C.B,0.03); P('sph',L.up,[0,-0.02,-0.03],[0.12,0.2,0.15],C.S,0.065); if(lh) P('sph',L.up,[0,-0.19,-0.09],[0.11,0.2,0.11],C.L,0.15);
         P('sph',L.knee,[0,0,0],[0.065,0.07,0.07],C.B,0.03); P('cyl',L.knee,[0,-0.17,0],[0.058,0.34,0.06],C.B,0.03); P('sph',L.knee,[0,-0.34,-0.01],[0.05,0.06,0.05],C.B,0.02); }
-      else { P('cyl',L.up,[0,-0.18,0],[0.078,0.36,0.082],C.B,0.03); P('sph',L.up,[0,0.02,0],[0.1,0.13,0.1],C.B,0.055); P('sph',L.knee,[0,0,-0.01],[0.06,0.07,0.06],C.B,0.03); P('cyl',L.knee,[0,-0.16,0],[0.055,0.32,0.055],C.B,0.03); }
+      else { P('cyl',L.up,[0,-0.18,0],[0.078,0.36,0.082],C.B,0.035); P('sph',L.up,[0,0.02,0],[0.1,0.13,0.1],C.B,0.06); if(lh) P('sph',L.up,[0,-0.16,-0.06],[0.055,0.17,0.05],C.L,0.11); P('sph',L.knee,[0,0,-0.01],[0.06,0.07,0.06],C.B,0.03); P('cyl',L.knee,[0,-0.16,0],[0.055,0.32,0.055],C.B,0.03); }
       P('sph',L.paw,[0,-0.045,0.03],[0.075,0.055,0.1],C.L,0.008); P('sph',L.paw,[0,-0.07,0.11],[0.07,0.035,0.045],C.L,0.006);
       for(const tx of [-0.042,0,0.042]) P('sph',L.paw,[tx,-0.075,0.12+(tx?0:0.015)],[0.026,0.024,0.036],C.L,0.004); }
-    this.tail.forEach((s,i)=>{ const r=0.05-0.006*i; P('cyl',s,[0,-0.09,0],[r,0.18,r],i<3?C.S:C.B,0.05,'tail'); if(lh) P('sph',s,[0,-0.09,0.02],[r+0.012,0.1,r+0.025],i<3?C.S:C.F,0.055,'tail'); });
+    this.tail.forEach((s,i)=>{ const r=0.05-0.006*i; P('cyl',s,[0,-0.09,0],[r,0.18,r],i<4?C.S:C.B,0.06,'tail'); if(lh){ P('sph',s,[0,-0.09,-0.02],[r+0.01,0.1,r+0.02],C.S,0.06,'tail'); P('sph',s,[0,-0.1,0.035],[r+0.005,0.09,r+0.015],C.F,0.075,'tail'); } });
     // ---- piezas que no forman parte de la piel: ojos con iris y párpados, nariz con fosas, colmillos, lengua
     const mkMesh=(geo,mat,parent,pos,scl,rot)=>{const m=new THREE.Mesh(geo,mat);m.position.set(...pos);m.scale.set(...scl);if(rot)m.rotation.set(...rot);m.castShadow=true;m.userData.zone='head';parent.add(m);return m;};
     const sphG=new THREE.SphereGeometry(1,20,14), lidG=new THREE.SphereGeometry(1,20,10,0,Math.PI*2,0,Math.PI*0.55);
-    const mSclera=new THREE.MeshPhysicalMaterial({color:0x9c8a78,roughness:0.2,clearcoat:1,clearcoatRoughness:0.05}),mIris=new THREE.MeshPhysicalMaterial({color:0x5a2e0e,roughness:0.15,clearcoat:1,clearcoatRoughness:0.03}),mPupil=new THREE.MeshPhysicalMaterial({color:0x050302,roughness:0.1,clearcoat:1});
+    const mSclera=new THREE.MeshPhysicalMaterial({color:0x9c8a78,roughness:0.2,clearcoat:1,clearcoatRoughness:0.05}),mIris=new THREE.MeshPhysicalMaterial({color:0x6e3d14,roughness:0.15,clearcoat:1,clearcoatRoughness:0.03}),mPupil=new THREE.MeshPhysicalMaterial({color:0x050302,roughness:0.1,clearcoat:1});
     const mLid=new THREE.MeshStandardMaterial({color:colors.mask,roughness:0.95}), mN=new THREE.MeshPhysicalMaterial({color:colors.nose,roughness:0.45,clearcoat:0.5,clearcoatRoughness:0.35,bumpMap:FUR_TEX,bumpScale:0.002}),mNostril=new THREE.MeshStandardMaterial({color:0x000000,roughness:1});
     const mTongue=new THREE.MeshPhysicalMaterial({color:0xd8607a,roughness:0.35,clearcoat:0.7}),mMouth=new THREE.MeshStandardMaterial({color:0x2a0e0c,roughness:1}),mTooth=new THREE.MeshPhysicalMaterial({color:0xf2ecdc,roughness:0.3,clearcoat:0.5});
     this.meshes=[this.mesh]; this.lids=[];
@@ -169,13 +170,38 @@ class Dog{
     // ---- atributos por vértice: pesos de huesos, color, largo de pelo, zona, uv triplanar
     const nv=pos.length/3, col=new Float32Array(nv*3), fur=new Float32Array(nv), zone=new Uint8Array(nv), sIdx=new Uint16Array(nv*4), sW=new Float32Array(nv*4), uv=new Float32Array(nv*2);
     const boneIndex=new Map(this.bones.map((b,i)=>[b,i])); const bw=new Float32Array(this.bones.length); const lenMul=this.longHair?1:0.35;
+    const inv={}; for(const b of this.bones) inv[b.name]=b.matrixWorld.clone().invert(); const lp=V3(), ln=V3();
+    const Cc=this.colors, cB=new THREE.Color(Cc.base), cL=new THREE.Color(Cc.light), cS=new THREE.Color(Cc.saddle), cK=new THREE.Color(Cc.mask), cF=new THREE.Color(Cc.fur), cTmp=new THREE.Color();
+    const sm=(t,w)=>clamp(t/w*0.5+0.5,0,1); const mixc=(a,b,t)=>cTmp.copy(a).lerp(b,t);
+    // devuelve el color del manto para un vértice: manto negro por altura en el lomo, máscara y casquete en la cabeza,
+    // orejas negras por detrás y fuego por delante, pechera dorada, vientre claro, cola negra arriba y dorada abajo
+    const coat=(x,y,z,nx,ny,nz,dom,out)=>{ const nz1=Math.sin(x*29.1+y*17.3)*Math.sin(z*31.7-y*13.1)*0.02; const name=dom.name;
+      lp.set(x,y,z).applyMatrix4(inv[name]); ln.set(nx,ny,nz).transformDirection(inv[name]);
+      if(name==='body'){ const by=lp.y,bz=lp.z; const thr=bz>0.2?lerp(-0.05,0.02,clamp((bz-0.2)/0.3,0,1)):bz<-0.4?lerp(-0.05,-0.01,clamp((-0.4-bz)/0.2,0,1)):-0.05;
+        const black=sm(by-thr+nz1,0.09), belly=sm(-0.14-by+nz1,0.08), gold=0.85*sm(bz-0.44,0.12)*sm(0.04-by,0.1)*clamp(ln.z*1.5,0,1);
+        out.copy(mixc(cB,cL,belly)); out.lerp(cF,gold); out.lerp(cS,black*(1-gold)); return; }
+      if(name==='neck'){ const top=sm(ny-0.3+nz1,0.25), front=sm(nz-0.45,0.25)*(1-top); out.copy(mixc(cB,cF,front)); out.lerp(cS,top); return; }
+      if(name==='head'){ const hx=lp.x,hy=lp.y,hz=lp.z;
+        const muzzle=sm(hz-0.13+nz1,0.06)*sm(0.1-hy,0.05); const eyes=sm(hz-0.09,0.05)*sm(0.13-hy,0.05)*sm(0.16-Math.abs(hx),0.05);
+        const cap=sm(hy-0.045+nz1,0.05)*sm(0.22-hz,0.06); const cheek=sm(Math.abs(hx)-0.11,0.05)*sm(0.05-hy,0.05);
+        const brow=Math.max(sm(0.045-Math.hypot(hx-0.09,hy-0.105,hz-0.185),0.02),sm(0.045-Math.hypot(hx+0.09,hy-0.105,hz-0.185),0.02));
+        out.copy(cB); out.lerp(cS,cap); out.lerp(cK,Math.max(muzzle,eyes)*(1-cheek*0.7)); out.lerp(cL,brow); return; }
+      if(name==='jaw'){ out.copy(cK); out.lerp(cB,sm(-0.05-lp.y,0.03)); return; }
+      if(name.startsWith('ear')){ const front=sm(lp.z-0.0+nz1,0.03), base=sm(0.06-lp.y,0.04); out.copy(mixc(cS,cL,front)); out.lerp(cB,base); return; }
+      if(name.startsWith('tail')){ const top=sm(-ln.z-0.1+nz1,0.35); out.copy(mixc(cF,cS,top)); return; }
+      if(name.endsWith('Paw')){ out.copy(cL); return; }
+      if(name==='rlUp'||name==='rrUp'){ const th=sm(lp.y+0.1+nz1,0.08)*sm(ln.y+0.1,0.4)*sm(0.02-lp.z,0.08); out.copy(cB); out.lerp(cS,th); return; }
+      out.copy(cB); };
+    const cOut=new THREE.Color();
     for(let v=0;v<nv;v++){ const x=pos[v*3],y=pos[v*3+1],z=pos[v*3+2]; bw.fill(0); let cr=0,cg=0,cb=0,cl=0,ws=0,best=-1,bz=0;
       for(const P of this.prims){ if(P.isCut)continue; if(x<P.bb.min.x||x>P.bb.max.x||y<P.bb.min.y||y>P.bb.max.y||z<P.bb.min.z||z>P.bb.max.z)continue; const ie=P.ie;
         const lx=ie[0]*x+ie[4]*y+ie[8]*z+ie[12], ly=ie[1]*x+ie[5]*y+ie[9]*z+ie[13], lz=ie[2]*x+ie[6]*y+ie[10]*z+ie[14];
         const d=Math.abs(primDist(P,lx,ly,lz)); const w=Math.exp(-d/0.02); if(w<1e-4)continue;
         bw[boneIndex.get(P.bone)]+=w; cr+=P.color.r*w; cg+=P.color.g*w; cb+=P.color.b*w; cl+=P.len*w; ws+=w; if(w>best){best=w;bz=P.zone;} }
       if(ws<=0){ ws=1; cr=cg=cb=0.5; }
-      col[v*3]=cr/ws; col[v*3+1]=cg/ws; col[v*3+2]=cb/ws; fur[v]=cl/ws*lenMul; zone[v]=bz;
+      let domB=0; for(let b=1;b<bw.length;b++) if(bw[b]>bw[domB]) domB=b;
+      coat(x,y,z,nrm[v*3],nrm[v*3+1],nrm[v*3+2],this.bones[domB],cOut);
+      const vn=1+0.07*Math.sin(x*41.3+y*23.7)*Math.sin(z*37.1+y*19.3); col[v*3]=cOut.r*vn; col[v*3+1]=cOut.g*vn; col[v*3+2]=cOut.b*vn; fur[v]=cl/ws*lenMul; zone[v]=bz;
       const order=[...bw.keys()].sort((a,b)=>bw[b]-bw[a]).slice(0,4); let tw=0; for(const b of order) tw+=bw[b]; if(tw<=0){ order[0]=0; tw=1; bw[0]=1; }
       for(let s=0;s<4;s++){ sIdx[v*4+s]=order[s]??0; sW[v*4+s]=order[s]===undefined?0:bw[order[s]]/tw; }
       const ax=Math.abs(nrm[v*3]),ay=Math.abs(nrm[v*3+1]),az=Math.abs(nrm[v*3+2]); const S=0.6; // proyección triplanar simple para el ruido del pelo
@@ -194,10 +220,10 @@ class Dog{
   // "fins": una tira de hebras por cada tantos vértices, perpendicular a la piel; el shader la muestra solo de canto (silueta)
   buildFins(){ const g=this.mesh.geometry, P=g.attributes.position.array, N=g.attributes.normal.array, Cc=g.attributes.color.array, F=g.attributes.furLen.array, SI=g.attributes.skinIndex.array, SW=g.attributes.skinWeight.array;
     const nv=P.length/3, step=MOBILE?6:3, flow=V3(0,-0.35,-1).normalize(), t=V3(), n=V3(), p=V3(); const pos=[],nrm=[],col=[],uv=[],si=[],sw=[],fl=[],idx=[];
-    for(let v=0;v<nv;v+=step){ const len=F[v]; if(len<0.03||Math.random()<0.45) continue;
+    for(let v=0;v<nv;v+=step){ const len=F[v]; if(len<0.03||Math.random()<0.45) continue; if(N[v*3+1]<-0.55&&Math.random()<0.6) continue;   // menos flecos bajo la panza
       n.set(N[v*3],N[v*3+1],N[v*3+2]); p.set(P[v*3],P[v*3+1],P[v*3+2]);
       t.crossVectors(n,flow); if(t.lengthSq()<1e-4) t.set(1,0,0); t.normalize().applyAxisAngle(n,rand(-0.7,0.7));
-      const w=rand(0.014,0.03)*clamp(len/0.06+0.4,0.5,1.2), L=Math.min(0.085,len*rand(0.8,1.25)), tx=n.x*L+flow.x*L*0.4, ty=n.y*L+flow.y*L*0.4, tz=n.z*L+flow.z*L*0.4, u0=Math.random();
+      const w=rand(0.012,0.026)*clamp(len/0.06+0.4,0.5,1.2), L=Math.min(0.07,len*rand(0.7,1.1)), tx=n.x*L+flow.x*L*0.4, ty=n.y*L+flow.y*L*0.4, tz=n.z*L+flow.z*L*0.4, u0=Math.random();
       const base=pos.length/3;
       pos.push(p.x-t.x*w,p.y-t.y*w,p.z-t.z*w, p.x+t.x*w,p.y+t.y*w,p.z+t.z*w, p.x-t.x*w+tx,p.y-t.y*w+ty,p.z-t.z*w+tz, p.x+t.x*w+tx,p.y+t.y*w+ty,p.z+t.z*w+tz);
       for(let k=0;k<4;k++){ nrm.push(n.x,n.y,n.z); col.push(Cc[v*3],Cc[v*3+1],Cc[v*3+2]); for(let j=0;j<4;j++){ si.push(SI[v*4+j]); sw.push(SW[v*4+j]); } fl.push(L); }

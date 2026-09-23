@@ -150,7 +150,7 @@ function finMaterial(id){ if(finMatCache[id])return finMatCache[id];
 const furMatCache={};
 // material de una capa de pelo: desplaza la malla a lo largo de la normal, cae con "gravedad", se mece, y oscurece la raíz (oclusión)
 function furMaterial(color,len,layer,layers,opts={}){ const vertex=!!opts.vertex; const key=color+'_'+len+'_'+layer+'_'+(vertex?'v':'s')+'_'+(opts.id||''); if(furMatCache[key])return furMatCache[key];
-  const u=layer/layers; const c=new THREE.Color(color).lerp(new THREE.Color(0xf3c98a),0.16*u);
+  const u=layer/layers; const c=new THREE.Color(color).lerp(new THREE.Color(0xf3c98a),0.07*u);
   const m=new THREE.MeshStandardMaterial({color:c,roughness:0.92,alphaMap:FUR_TEX,alphaTest:0.5,side:THREE.DoubleSide,vertexColors:vertex});
   // el desplazamiento va DESPUÉS del skinning: así la capa sigue al hueso y objectNormal ya está deformada.
   // Cada capa: sale por la normal, cae por gravedad, fluye hacia atrás (dirección de crecimiento), se arrastra con la velocidad y se mece.
@@ -165,9 +165,9 @@ function furMaterial(color,len,layer,layers,opts={}){ const vertex=!!opts.vertex
         float hair=texture2D(alphaMap,vAlphaMapUv).g; diffuseColor.a*=step(0.05+pow(uLayer,0.8)*0.92,hair);
       #endif`)
       .replace('#include <color_fragment>',`#include <color_fragment>
-        diffuseColor.rgb*=mix(0.5,1.2,pow(uLayer,0.6));`)
+        diffuseColor.rgb*=mix(0.5,1.08,pow(uLayer,0.6));`)
       .replace('#include <opaque_fragment>',`#include <opaque_fragment>
-        float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vViewPosition)),0.0),3.0); gl_FragColor.rgb+=diffuseColor.rgb*rim*0.5*uLayer;`); };
+        float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vViewPosition)),0.0),3.0); gl_FragColor.rgb+=diffuseColor.rgb*rim*0.3*uLayer;`); };
   furMatCache[key]=m; return m; }
 // platos
 const bowls=new THREE.Group(); scene.add(bowls);
