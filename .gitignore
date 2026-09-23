@@ -6,3 +6,5 @@ dante-photos/
 .playwright-mcp/
 .vercel
 .env*
+test-results/
+playwright-report/

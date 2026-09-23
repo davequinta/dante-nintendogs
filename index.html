@@ -68,12 +68,15 @@
   </div>
   <div id="right">
     <button class="iconbtn" id="menuBtn" title="Ajustes">⚙️</button>
+    <button class="iconbtn" id="camBtn" title="Cámara">🎥</button>
     <button class="iconbtn" id="photoBtn" title="Foto">📷</button>
   </div>
 </div>
 <div id="bubble"></div>
 <div id="toast"></div>
 <div id="hint"></div>
+<div id="toys"><button data-toy="ball">🎾 Pelota</button><button data-toy="frisbee">🥏 Frisbee</button><button data-toy="mango">🥭 Mango</button><button data-toy="rope">🪢 Soga</button></div>
+<button id="tugBtn">🪢 ¡Tirar!</button>
 <button id="kennelBtn">🔒 Cerrar puerta del kennel</button>
 <div id="tricks">
   <button class="trick" data-trick="sit">🪑 Sit<span class="prog"><i></i></span></button>
@@ -86,17 +89,19 @@
   <button data-trick="mango">🥭 Mango</button>
 </div>
 <div id="achv"><div class="panel">
-  <h2>🏅 Logros de Dante</h2><div class="sub" id="achvSub"></div>
+  <h2>🏅 Logros de Dante</h2><div class="sub" id="ageLine"></div><div class="sub" id="achvSub"></div>
   <div class="medals" id="medals"></div>
   <h2 style="font-size:16px">🎓 Entrenamiento</h2><div class="tr" id="training"></div>
+  <h2 style="font-size:16px;margin-top:12px">📔 Diario</h2><div id="diary" class="diary"></div>
   <button class="close" id="achvClose">Cerrar</button>
 </div></div>
 <div id="toolbar">
   <button class="tool active" data-tool="hand"><span class="ic">🖐️</span>Acariciar</button>
   <button class="tool" data-action="food"><span class="ic">🍖</span>Comida</button>
   <button class="tool" data-action="water"><span class="ic">💧</span>Agua</button>
-  <button class="tool" data-tool="ball"><span class="ic">🎾</span>Pelota</button>
+  <button class="tool" data-tool="ball" id="toyTool"><span class="ic">🎾</span>Pelota</button>
   <button class="tool" data-tool="brush"><span class="ic">🪮</span>Cepillo</button>
+  <button class="tool" data-tool="hose"><span class="ic">🚿</span>Baño</button>
   <button class="tool" data-action="tricks"><span class="ic">🎓</span>Trucos</button>
   <button class="tool" data-action="visit"><span class="ic">🚪</span>Visita</button>
   <button class="tool" data-action="night"><span class="ic">🌙</span>Noche</button>

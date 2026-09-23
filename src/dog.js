@@ -132,7 +132,7 @@ class Dog{
     this.pose=basePose(); this.target=basePose();
     this.speed=0; this.heading=0; this.gait=0; this.look={yaw:0,pitch:0}; this.lookT={yaw:0,pitch:0};
     this.blink=rand(2,5); this.blinkT=0; this.breath=rand(0,6); this.wagT=0; this.twitch=[0,0]; this.twitchT=rand(1,4);
-    this.pant=false; this.tmp=V3(); this.prevHeading=0; this.earSwing=0;
+    this.pant=false; this.tmp=V3(); this.prevHeading=0; this.earSwing=0; this.touch={pos:V3(0,-9,0),dir:V3(0,0,1),w:0};
   }
   // Campo de distancia -> marching cubes -> atributos por vértice -> SkinnedMesh
   buildSkin(){
@@ -256,6 +256,8 @@ class Dog{
     fg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); fg.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(si,4)); fg.setAttribute('skinWeight',new THREE.Float32BufferAttribute(sw,4)); fg.setAttribute('finLen',new THREE.Float32BufferAttribute(fl,1)); fg.setIndex(idx);
     this.fins=new THREE.SkinnedMesh(fg,finMaterial(this.id)); this.fins.bind(this.skeleton,this.mesh.bindMatrix); this.fins.castShadow=false; this.fins.frustumCulled=false; this.fins.raycast=()=>{}; this.root.add(this.fins); this.stats.fins=idx.length/6; }
   setFur(on){ for(const sh of this.shells) sh.visible=on; if(this.fins) this.fins.visible=on; }
+  // la mano pasó por `point` moviéndose en `dir` (mundo): el pelo se aplasta y se peina ahí un momento
+  touchAt(point,dir){ this.touch.pos.copy(point); if(dir&&dir.lengthSq()>1e-6) this.touch.dir.copy(dir).normalize(); this.touch.w=1; }
   setDirty(on){ if(this.dirty===on)return; this.dirty=on; const a=this.mesh.geometry.attributes.color; a.array.set(on?this.dirtyColor:this.cleanColor); a.needsUpdate=true; }
   zoneAt(hit){ if(hit.object.userData.zone) return hit.object.userData.zone; if(hit.object===this.mesh&&hit.face) return ZONES[this.zoneAttr[hit.face.a]]; return 'body'; }
   setPose(p,extra){Object.assign(this.target,basePose(),p,extra||{});}
@@ -294,7 +296,8 @@ class Dog{
     this.tail.forEach((sg,i)=>{sg.rotation.x=i===0?0.6+p.tailLift*1.2:0.16; sg.rotation.z=Math.sin(this.wagT-i*0.7)*wa*(i===0?1:0.55);});
     this.root.rotation.y=this.heading;
     // pelo con inercia: las capas se arrastran hacia atrás según la velocidad
-    for(const sh of this.shells){ const u=sh.material.userData.uDrag; if(u) u.value=damp(u.value,this.speed,4,dt); }
+    this.touch.w=Math.max(0,this.touch.w-dt*1.6);
+    for(const sh of this.shells){ const ud=sh.material.userData; if(ud.uDrag) ud.uDrag.value=damp(ud.uDrag.value,this.speed,4,dt); if(ud.uTouch){ ud.uTouch.value.set(this.touch.pos.x,this.touch.pos.y,this.touch.pos.z,this.touch.w); ud.uTouchDir.value.copy(this.touch.dir); } }
     { const u=this.fins.material.userData.uDrag; if(u) u.value=damp(u.value,this.speed,4,dt); }
     // sombra de contacto: se achica y aclara cuando salta
     const lift=clamp(p.bodyY,0,1); this.blob.scale.setScalar(1-lift*0.4); this.blob.material.opacity=1-lift*0.8;

@@ -32,6 +32,14 @@ src/
   main.js           interacción (raycaster, herramientas), UI, reloj, guardado y loop
 ```
 
+## Pruebas
+
+```bash
+npm test        # pruebas de humo con Playwright contra dist/ (corre npm run build antes)
+```
+
+Corren también en GitHub Actions en cada push.
+
 ## Deploy
 
 Sitio estático en Vercel: `vercel.json` define el build de Vite y los headers de caché. Producción en https://dante.davidquinta.tech.
@@ -73,5 +81,9 @@ Hay una bitácora con capturas de hasta dónde llegó el enfoque de código puro
 - **Noche**: por defecto sigue el reloj real de El Salvador. Va al kennel; solo llora si le cerrás la puerta.
 - **Kiara** entra de vez en cuando por la puerta de la casa. Mejor no acercarse a su cama.
 - Tocá el nombre "Dante" para ver logros, racha de días y entrenamiento.
+- **Juguetes**: tocá Pelota para elegir pelota, frisbee (vuela plano), mango (rueda torcido) o soga (tira y afloja con el botón ¡Tirar!).
+- **🚿 Baño**: mantené apretado sobre Dante con la manguera; sube limpieza y al terminar se sacude y te moja.
+- **Kiara** también se deja acariciar, pero Dante se pone celoso si le hacés mucho caso.
+- **🎥 Cámara**: libre, siguiendo a Dante o selfie. **📷** guarda o comparte una foto con marco.
 - **⚙️ Ajustes**: calidad gráfica (Auto, Alta o Ligera), sonido, reloj, pelo, tutorial y reinicio. **📷** guarda una foto de la escena.
 - Si el juego tarda en cargar, la pantalla de carga ofrece pasar a modo ligero; si algo falla, muestra el error para poder reportarlo.

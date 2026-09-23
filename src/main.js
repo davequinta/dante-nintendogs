@@ -1,20 +1,21 @@
 import * as THREE from 'three';
 import { clamp, lerp, damp, $, V3, B, KENNEL_POS, KENNEL_DIR } from './utils.js';
 import { Audio } from './audio.js';
-import { Save, stats, DECAY, world, TRICKS, training, achv, addStat } from './state.js';
-import { QUALITY, LITE, sky, MOBILE, canvas, renderer, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, skyUniforms, rebuildEnv, kennelDoor, kennelDoorMeshes, kibble, waterMesh, clouds, ball, previewDots, Particles } from './scene.js';
+import { Save, stats, DECAY, world, TRICKS, training, achv, addStat, ageInfo, diary } from './state.js';
+import { TOYS, hose, QUALITY, LITE, sky, MOBILE, canvas, renderer, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, skyUniforms, rebuildEnv, kennelDoor, kennelDoorMeshes, kibble, waterMesh, clouds, ball, previewDots, Particles } from './scene.js';
 import { POSES, dante, kiara, buildDante, buildKiara } from './dog.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { bubble, say, toast, updateToast, FREE, ai, visit, kiaraAI, setState, cursor, updateAI, cmdFood, cmdWater, cmdTrick, cmdVisit, setNight, cmdNight, toggleKennelDoor, updateKennelBtn, updateVisit, kSet, updateKiara, updateFlies, updateBall } from './ai.js';
+import { cmdTug, hoseTick, hoseEnd, petKiara, bubble, say, toast, updateToast, FREE, ai, visit, kiaraAI, setState, cursor, updateAI, cmdFood, cmdWater, cmdTrick, cmdVisit, setNight, cmdNight, toggleKennelDoor, updateKennelBtn, updateVisit, kSet, updateKiara, updateFlies, updateBall } from './ai.js';
 
 // ---------- INTERACTIONS (raycaster, herramientas, lanzamiento)
 const ray=new THREE.Raycaster(); const ndc=new THREE.Vector2(); const groundPlane=new THREE.Plane(V3(0,1,0),0); const lookPlane=new THREE.Plane(V3(0,1,0),-0.9);
 let tool='hand'; const drag={active:false,mode:null,sx:0,sy:0,lx:0,ly:0,acc:0,id:null};
 function setNDC(e){ const r=canvas.getBoundingClientRect(); ndc.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1); ray.setFromCamera(ndc,camera); }
 function hitDog(e){ setNDC(e); const h=ray.intersectObjects(dante.meshes,false); return h.length?h[0]:null; }
+function hitKiara(e){ if(!kiara||!kiara.root.visible) return null; setNDC(e); const h=ray.intersectObjects(kiara.meshes,false); return h.length?h[0]:null; }
 function throwVector(dx,dy){ const f=V3(); camera.getWorldDirection(f); f.y=0; f.normalize();
   const o=camera.position.clone().addScaledVector(f,1.7); o.y=clamp(camera.position.y-1.3,0.6,3);
   const force=clamp(-dy/(Math.min(innerWidth,innerHeight)*0.42),0.12,1); const yaw=-dx/innerWidth*1.5;
@@ -27,7 +28,8 @@ function doThrow(dx,dy){ hidePreview(); if(Math.hypot(dx,dy)<18) return; const {
   if(ball.held) return; ball.mesh.visible=true; ball.mesh.position.copy(o); ball.vel.copy(v); ball.flying=true; ball.rest=false;
   ball.returnPt.copy(o).addScaledVector(f,1.2); ball.returnPt.y=0; ball.returnPt.x=clamp(ball.returnPt.x,-B+0.5,B-0.5); ball.returnPt.z=clamp(ball.returnPt.z,-B+0.5,B-0.5);
   Audio.swish(); if(!world.night&&ai.state!=='bark'&&ai.state!=='to_gate'&&ai.state!=='eat'&&ai.state!=='drink') setState('fetch_chase'); }
-function petTick(hit){ const zone=dante.zoneAt(hit);
+const lastHit=V3(); let hasLastHit=false;
+function petTick(hit){ const zone=dante.zoneAt(hit); const dir=hasLastHit?hit.point.clone().sub(lastHit):null; lastHit.copy(hit.point); hasLastHit=true; dante.touchAt(hit.point,dir);
   if(tool==='brush'){ addStat('limpieza',0.9); addStat('felicidad',0.15); for(let i=0;i<2;i++) Particles.spawn('hair',hit.point,{life:1.1,speed:0.8,size:0.16,grav:1.5}); if(Math.random()<0.25)Audio.swish(); if(Math.random()<0.05)say('brush',2); if(FREE.has(ai.state)&&ai.state!=='groom'&&ai.state!=='bellyup') setState('groom'); ai.petting=true; ai.afterPet=0.8; return; }
   addStat('felicidad',0.5); if(Math.random()<0.5) Particles.spawn('heart',hit.point.clone().add(V3(0,0.1,0)),{life:1.1,speed:0.7,size:0.22});
   if(Math.random()<0.06){ if(zone==='head')say('petHead',1.8); else if(zone==='tail')say('petTail',1.8); }
@@ -39,26 +41,41 @@ function petTick(hit){ const zone=dante.zoneAt(hit);
 }
 canvas.addEventListener('pointerdown',e=>{ Audio.ensure(); if(drag.active)return;
   drag.sx=drag.lx=e.clientX; drag.sy=drag.ly=e.clientY; drag.acc=0; drag.id=e.pointerId;
-  if(tool==='ball'){ if(world.night){toast('Es de noche, Dante duerme 💤');return;} drag.active=true; drag.mode='throw'; controls.enabled=false; canvas.setPointerCapture(e.pointerId); return; }
+  if(tool==='hose'){ if(world.night){toast('Es de noche, Dante duerme 💤');return;} drag.active=true; drag.mode='hose'; hoseTarget.set(e.clientX,e.clientY); controls.enabled=false; canvas.setPointerCapture(e.pointerId); return; }
+  if(tool==='ball'){ if(world.toy==='rope'){ cmdTug(); return; } if(world.night){toast('Es de noche, Dante duerme 💤');return;} drag.active=true; drag.mode='throw'; controls.enabled=false; canvas.setPointerCapture(e.pointerId); return; }
   setNDC(e); if(ray.intersectObjects(kennelDoorMeshes,false).length){ toggleKennelDoor(); return; }
-  const h=hitDog(e); if(h){ drag.active=true; drag.mode='pet'; controls.enabled=false; canvas.setPointerCapture(e.pointerId); petTick(h); }
+  const h=hitDog(e); if(h){ drag.active=true; drag.mode='pet'; controls.enabled=false; canvas.setPointerCapture(e.pointerId); hasLastHit=false; petTick(h); return; }
+  const hk=hitKiara(e); if(hk&&tool==='hand'){ drag.active=true; drag.mode='petk'; controls.enabled=false; canvas.setPointerCapture(e.pointerId); petKiara(hk); }
 },{capture:true});
+// ---------- modos de cámara: libre (órbita), seguir (detrás de Dante) y selfie (de frente a su cara)
+const CAM_MODES=['free','follow','selfie'], CAM_ICON={free:'🎥',follow:'🐕',selfie:'🤳'}; let camMode='free';
+function setCamMode(m){ camMode=m; controls.enabled=m==='free'; $('#camBtn').textContent=CAM_ICON[m]; toast(m==='free'?'Cámara libre':m==='follow'?'Cámara siguiendo a Dante':'Cámara selfie 🤳',1.4); }
+$('#camBtn').addEventListener('click',()=>{ Audio.ensure(); setCamMode(CAM_MODES[(CAM_MODES.indexOf(camMode)+1)%3]); });
 canvas.addEventListener('pointermove',e=>{ setNDC(e); const pt=V3(); if(ray.ray.intersectPlane(lookPlane,pt)){ cursor.world.copy(pt); cursor.has=true; }
   if(!drag.active||e.pointerId!==drag.id)return;
   const dx=e.clientX-drag.sx, dy=e.clientY-drag.sy;
   if(drag.mode==='throw'){ showPreview(dx,dy); return; }
+  if(drag.mode==='hose'){ hoseTarget.set(e.clientX,e.clientY); return; }
   drag.acc+=Math.hypot(e.clientX-drag.lx,e.clientY-drag.ly); drag.lx=e.clientX; drag.ly=e.clientY;
-  if(drag.acc>34){ drag.acc=0; const h=hitDog(e); if(h) petTick(h); }
+  if(drag.acc>34){ drag.acc=0; if(drag.mode==='petk'){ const hk=hitKiara(e); if(hk) petKiara(hk); } else { const h=hitDog(e); if(h) petTick(h); } }
 });
-function endDrag(e){ if(!drag.active||e.pointerId!==drag.id)return; drag.active=false; controls.enabled=true;
-  if(drag.mode==='throw') doThrow(e.clientX-drag.sx,e.clientY-drag.sy); ai.petting=false; drag.mode=null; }
+function endDrag(e){ if(!drag.active||e.pointerId!==drag.id)return; drag.active=false; controls.enabled=camMode==='free'; hasLastHit=false;
+  if(drag.mode==='throw') doThrow(e.clientX-drag.sx,e.clientY-drag.sy); if(drag.mode==='hose') hoseEnd(); ai.petting=false; drag.mode=null; }
+// la manguera se evalúa cada frame mientras el dedo está apretado: el chorro apunta al perro o al piso bajo el cursor
+const hoseTarget=new THREE.Vector2(-1,-1), hosePt=V3();
+function updateHose(dt){ if(!drag.active||drag.mode!=='hose') return; const fake={clientX:hoseTarget.x,clientY:hoseTarget.y}; const h=hitDog(fake); if(h) hosePt.copy(h.point); else { setNDC(fake); if(!ray.ray.intersectPlane(groundPlane,hosePt)) return; } hoseTick(hosePt,dt); }
 canvas.addEventListener('pointerup',endDrag); canvas.addEventListener('pointercancel',endDrag);
 canvas.addEventListener('pointerleave',()=>{cursor.has=false;});
 
 // ---------- UI
-const HINTS={hand:'Arrastrá sobre Dante para acariciarlo',brush:'Pasá el cepillo sobre su pelo',ball:'Arrastrá hacia arriba para apuntar y lanzar 🎾'};
-function selectTool(t){ tool=t; document.querySelectorAll('.tool[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t)); $('#hint').textContent=HINTS[t]; $('#tricks').classList.remove('show'); }
+const HINTS={hand:'Arrastrá sobre Dante para acariciarlo',brush:'Pasá el cepillo sobre su pelo',ball:'Arrastrá hacia arriba para apuntar y lanzar',hose:'Mantené apretado sobre Dante para bañarlo 🚿'};
+const TOY_LABEL={ball:['🎾','Pelota'],frisbee:['🥏','Frisbee'],mango:['🥭','Mango'],rope:['🪢','Soga']};
+function setToy(t){ world.toy=t; const [ic,name]=TOY_LABEL[t]; $('#toyTool').innerHTML=`<span class="ic">${ic}</span>${name}`; document.querySelectorAll('#toys button').forEach(b=>b.classList.toggle('on',b.dataset.toy===t)); }
+document.querySelectorAll('#toys button').forEach(b=>b.addEventListener('click',()=>{ setToy(b.dataset.toy); $('#toys').classList.remove('show'); if(b.dataset.toy==='rope') cmdTug(); }));
+$('#tugBtn').addEventListener('click',()=>{ Audio.ensure(); cmdTug(); });
+function selectTool(t){ tool=t; document.querySelectorAll('.tool[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t)); $('#hint').textContent=HINTS[t]; $('#tricks').classList.remove('show'); if(t!=='ball') $('#toys').classList.remove('show'); if(t!=='hose') hoseEnd(); }
 document.querySelectorAll('.tool').forEach(b=>b.addEventListener('click',()=>{ Audio.ensure();
+  if(b.dataset.tool==='ball'){ const already=tool==='ball'; selectTool('ball'); $('#toys').classList.toggle('show',!already||!$('#toys').classList.contains('show')); return; }
   if(b.dataset.tool) return selectTool(b.dataset.tool);
   const a=b.dataset.action; $('#tricks').classList.toggle('show',a==='tricks'&&!$('#tricks').classList.contains('show'));
   if(a==='food')cmdFood(); else if(a==='water')cmdWater(); else if(a==='visit')cmdVisit(); else if(a==='night')cmdNight(); }));
@@ -76,9 +93,17 @@ $('#helpBtn').addEventListener('click',()=>{ closeModal('#menu'); openModal('#we
 $('#welcomeGo').addEventListener('click',()=>{ Audio.ensure(); closeModal('#welcome'); try{ localStorage.setItem('dante-welcomed','1'); }catch(e){} });
 document.querySelectorAll('#qualitySeg button').forEach(b=>{ b.classList.toggle('on',b.dataset.q===QUALITY);
   b.addEventListener('click',()=>{ if(b.dataset.q===QUALITY)return; try{ localStorage.setItem('dante-quality',b.dataset.q); }catch(e){} persist(); toast('Cambiando calidad…',1.5); setTimeout(()=>location.reload(),300); }); });
-$('#photoBtn').addEventListener('click',()=>{ Audio.ensure(); if(composer) composer.render(); else renderer.render(scene,camera); const url=canvas.toDataURL('image/jpeg',0.92);
-  const fl=document.createElement('div'); fl.className='flash go'; document.body.appendChild(fl); setTimeout(()=>fl.remove(),500); Audio.snap();
-  const a=document.createElement('a'); a.href=url; a.download=`dante-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.jpg`; document.body.appendChild(a); a.click(); a.remove(); toast('📷 Foto guardada'); achv.photos=(achv.photos||0)+1; });
+$('#photoBtn').addEventListener('click',async()=>{ Audio.ensure(); if(composer) composer.render(); else renderer.render(scene,camera);
+  // marco: la escena + banda inferior con nombre, título y fecha; se comparte por la hoja nativa del celular si existe, si no se descarga
+  const W=canvas.width,H=canvas.height,pad=Math.round(W*0.03),band=Math.round(H*0.11); const c=document.createElement('canvas'); c.width=W+pad*2; c.height=H+pad+band; const g=c.getContext('2d');
+  g.fillStyle='#fff6e6'; g.fillRect(0,0,c.width,c.height); g.drawImage(canvas,pad,pad,W,H);
+  g.fillStyle='#4a2f1b'; g.font=`900 ${Math.round(band*0.42)}px Nunito, system-ui, sans-serif`; g.textBaseline='middle'; g.fillText('★ Dante',pad,H+pad+band*0.38);
+  const age=ageInfo(); g.font=`700 ${Math.round(band*0.24)}px Nunito, system-ui, sans-serif`; g.fillStyle='#8a6a3c'; g.fillText(`Pastor alemán · Campeón ACANSAL ×2 · ${age.years?age.years+' año'+(age.years>1?'s':'')+' y ':''}${age.mRem} meses`,pad,H+pad+band*0.72);
+  g.textAlign='right'; g.fillStyle='#4a2f1b'; g.fillText(new Date().toLocaleDateString('es-SV',{day:'numeric',month:'long',year:'numeric'}),c.width-pad,H+pad+band*0.72); g.font=`900 ${Math.round(band*0.3)}px Nunito, system-ui, sans-serif`; g.fillText('dante.davidquinta.tech',c.width-pad,H+pad+band*0.36);
+  const fl=document.createElement('div'); fl.className='flash go'; document.body.appendChild(fl); setTimeout(()=>fl.remove(),500); Audio.snap(); achv.photos=(achv.photos||0)+1; diary('Le tomaste una foto');
+  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92)); const file=new File([blob],`dante-${new Date().toISOString().slice(0,10)}.jpg`,{type:'image/jpeg'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:'Dante 🏅',text:'Mirá a Dante, campeón de El Salvador 🐕'}); toast('📷 Compartida'); return; }catch(e){} }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); toast('📷 Foto guardada'); });
 // números flotantes cuando un stat cambia de golpe
 const STAT_ICON={hambre:'🍖',sed:'💧',energia:'⚡',felicidad:'💗',limpieza:'✨'}; let floatT=0;
 addEventListener('dante:stat',e=>{ const {k,d}=e.detail; if(world.time-floatT<0.25) return; floatT=world.time; const bar=$('#f-'+k); if(!bar)return; const r=bar.getBoundingClientRect();
@@ -101,9 +126,15 @@ const MEDALS=[
   {id:'mango',ic:'🥭',name:'Manguero',desc:'10 mangos',test:()=>achv.mangos>=10},
   {id:'guard',ic:'🛡️',name:'Guardián',desc:'5 visitas calmadas',test:()=>achv.visits>=5},
   {id:'champ',ic:'🏆',name:'Campeón ACANSAL',desc:'Pose de show al 100%',test:()=>training.show>=100},
+  {id:'bath',ic:'🚿',name:'Limpio y sacudido',desc:'5 baños',test:()=>achv.baths>=5},
+  {id:'tug',ic:'🪢',name:'Tira y afloja',desc:'5 sogas ganadas',test:()=>achv.tugs>=5},
+  {id:'frisbee',ic:'🥏',name:'Al vuelo',desc:'10 frisbees',test:()=>achv.frisbees>=10},
+  {id:'kiara',ic:'🐕‍🦺',name:'Amigo de Kiara',desc:'30 caricias a Kiara',test:()=>achv.kiaraPets>=30},
+  {id:'photo',ic:'📷',name:'Modelo',desc:'10 fotos',test:()=>achv.photos>=10},
 ];
 function checkMedals(){ for(const m of MEDALS){ if(!achv.unlocked.includes(m.id)&&m.test()){ achv.unlocked.push(m.id); toast(`🏅 Logro: ${m.name}`,3.5); Audio.chime(); } } }
-function renderAchv(){ $('#achvSub').textContent=`Racha: ${achv.streak} día${achv.streak===1?'':'s'} 🔥 · Días cuidándolo: ${achv.days.length} · Pelotas: ${achv.fetches} · Trucos: ${achv.tricks}`;
+function renderAchv(){ const age=ageInfo(); $('#ageLine').textContent=`🎂 Nació el 28 de julio de 2025 · ${age.years?age.years+' año'+(age.years>1?'s':'')+' y ':''}${age.mRem} meses (${age.days} días)`; $('#diary').innerHTML=(achv.diary||[]).slice(-25).reverse().map(e=>`<div><small>${e.d.slice(5).replace('-','/')}</small>${e.t}</div>`).join('')||'<div>Todavía no pasó nada. ¡A jugar!</div>';
+  $('#achvSub').textContent=`Racha: ${achv.streak} día${achv.streak===1?'':'s'} 🔥 · Días cuidándolo: ${achv.days.length} · Pelotas: ${achv.fetches} · Trucos: ${achv.tricks}`;
   $('#medals').innerHTML=MEDALS.map(m=>{const ok=achv.unlocked.includes(m.id);return `<div class="m ${ok?'':'locked'}"><span class="ic">${m.ic}</span><span>${m.name}<small>${m.desc}</small></span></div>`;}).join('');
   $('#training').innerHTML=Object.keys(TRICKS).map(k=>`<span>${TRICKS[k]}</span><div class="bar"><div class="fill" style="width:${training[k]}%;background:var(--gold)"></div></div><span>${Math.round(training[k])}%</span>`).join(''); }
 // ---------- reloj real de El Salvador
@@ -145,8 +176,8 @@ function updateDayNight(dt){ world.nightT=damp(world.nightT,world.night?1:0,1.6,
 let lastEnvN=-1;
 
 // ---------- SAVE / LOAD
-function snapshot(){ return {stats:{...stats},night:world.night,food:world.food,water:world.water,training:{...training},achv:{...achv},autoClock:world.autoClock,fur:world.fur,kennelClosed:world.kennelClosed}; }
-function applySave(s){ if(!s)return; Object.assign(stats,s.stats||{}); world.food=s.food||0; world.water=s.water||0;
+function snapshot(){ return {toy:world.toy,stats:{...stats},night:world.night,food:world.food,water:world.water,training:{...training},achv:{...achv},autoClock:world.autoClock,fur:world.fur,kennelClosed:world.kennelClosed}; }
+function applySave(s){ if(!s)return; Object.assign(stats,s.stats||{}); world.food=s.food||0; world.water=s.water||0; if(s.toy&&s.toy!=='rope') world.toy=s.toy;
   if(s.training) for(const k in training) training[k]=clamp(s.training[k]||0,0,100); if(s.achv) Object.assign(achv,s.achv);
   if(s.autoClock===false){ world.autoClock=false; $('#auto').classList.remove('on'); }
   if(s.fur===false){ world.fur=false; $('#furbtn').classList.remove('on'); dante.setFur(false); kiara.setFur(false); ball.mesh.children.forEach(c=>c.visible=false); }
@@ -156,7 +187,7 @@ function applySave(s){ if(!s)return; Object.assign(stats,s.stats||{}); world.foo
     const h=Math.floor(mins/60),m=Math.round(mins%60); toast(`Pasaron ${h?h+' h ':''}${m} min. Dante te extrañó 🐕`,4); }
   if(s.night&&!(world.autoClock&&!(world.svHour<5.75||world.svHour>=18.25))){ world.night=true; world.nightT=1; $('[data-action=night]').classList.add('on'); dante.root.position.copy(KENNEL_POS).addScaledVector(KENNEL_DIR,0.05); dante.heading=Math.PI/4; setState('sleep'); }
 }
-function loadSaved(){ applySave(Save.load()); kibble.visible=world.food>0; waterMesh.visible=world.water>0; registerDay(); updateTrickUI(); updateKennelBtn(); checkMedals();
+function loadSaved(){ applySave(Save.load()); setToy(world.toy||'ball'); kibble.visible=world.food>0; waterMesh.visible=world.water>0; registerDay(); updateTrickUI(); updateKennelBtn(); checkMedals();
   if(world.autoClock&&!world.night){ const {h,m}=svParts(); world.svHour=h+m/60; if(world.svHour<5.75||world.svHour>=18.25){ world.night=true; world.nightT=1; $('[data-action=night]').classList.add('on'); dante.root.position.copy(KENNEL_POS).addScaledVector(KENNEL_DIR,0.05); dante.heading=Math.PI/4; setState('sleep'); } } }
 let saveT=5; function persist(){ Save.write(snapshot()); }
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) persist(); }); addEventListener('pagehide',persist);
@@ -172,6 +203,12 @@ if(!LITE){ composer=new EffectComposer(renderer); composer.setPixelRatio(rendere
 function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); if(composer){ composer.setSize(w,h); } }
 addEventListener('resize',resize); resize();
 const clock=new THREE.Clock(); let hudT=0, medalT=6; const camDelta=V3(), camGoal=V3();
+// resolución adaptativa: si el frame rate cae, baja el pixel ratio; si sobra, lo sube hasta el original
+const BASE_PR=renderer.getPixelRatio(); let curPR=BASE_PR, fpsEma=60, lowT=0, highT=0;
+function adaptResolution(dt){ fpsEma=lerp(fpsEma,1/Math.max(dt,1e-3),0.05);
+  if(fpsEma<28){ lowT+=dt; highT=0; } else if(fpsEma>55){ highT+=dt; lowT=0; } else { lowT=highT=0; }
+  if(lowT>2&&curPR>0.55){ curPR=Math.max(0.55,curPR-0.15); renderer.setPixelRatio(curPR); if(composer)composer.setPixelRatio(curPR); resize(); lowT=0; toast('Bajando resolución para que vaya fluido',1.6); }
+  if(highT>6&&curPR<BASE_PR){ curPR=Math.min(BASE_PR,curPR+0.15); renderer.setPixelRatio(curPR); if(composer)composer.setPixelRatio(curPR); resize(); highT=0; } }
 function frame(){ requestAnimationFrame(frame); const dt=Math.min(clock.getDelta(),0.05); world.time+=dt; TIME.value=world.time;
   for(const k in DECAY){ if(k==='energia'&&ai.state==='sleep')continue; addStat(k,-DECAY[k]*dt/60); }
   updateAI(dt); dante.root.updateMatrixWorld(true);
@@ -180,11 +217,15 @@ function frame(){ requestAnimationFrame(frame); const dt=Math.min(clock.getDelta
   medalT-=dt; if(medalT<0){ medalT=4; checkMedals(); }
   kibble.scale.y=Math.max(0.05,world.food); kibble.visible=world.food>0.02; waterMesh.scale.y=Math.max(0.05,world.water); waterMesh.visible=world.water>0.02;
   for(const c of clouds){ c.position.x+=c.userData.v*dt; if(c.position.x>34)c.position.x=-34; }
-  // la cámara sigue suavemente a Dante sin quitar el control de órbita
-  const dp=dante.root.position; camGoal.set(dp.x*0.55,0.6,dp.z*0.55); camDelta.copy(camGoal).sub(controls.target).multiplyScalar(1-Math.exp(-1.8*dt));
-  controls.target.add(camDelta); camera.position.add(camDelta); controls.update();
+  // cámara: libre sigue suavemente sin quitar la órbita; seguir va detrás de él; selfie va delante de su cara
+  const dp=dante.root.position;
+  if(camMode==='free'){ camGoal.set(dp.x*0.55,0.6,dp.z*0.55); camDelta.copy(camGoal).sub(controls.target).multiplyScalar(1-Math.exp(-1.8*dt)); controls.target.add(camDelta); camera.position.add(camDelta); controls.update(); }
+  else { const fwd=V3(Math.sin(dante.heading),0,Math.cos(dante.heading)); const k=1-Math.exp(-3*dt);
+    if(camMode==='follow'){ camGoal.copy(dp).addScaledVector(fwd,-3.4); camGoal.y=1.7; camera.position.lerp(camGoal,k); controls.target.lerp(V3(dp.x,0.7,dp.z),k); }
+    else { const hp=dante.head.getWorldPosition(camDelta); camGoal.copy(hp).addScaledVector(fwd,2.1); camGoal.y=hp.y+0.05; camera.position.lerp(camGoal,k); controls.target.lerp(V3(hp.x,hp.y-0.25,hp.z),k); }
+    camera.lookAt(controls.target); }
   hudT-=dt; if(hudT<0){ hudT=0.2; updateHUD(); } updateBubble(dt);
-  updateToast(dt);
+  updateToast(dt); adaptResolution(dt); updateHose(dt); $('#tugBtn').classList.toggle('show',ai.state==='tug');
   saveT-=dt; if(saveT<0){ saveT=6; persist(); }
   if(composer) composer.render(); else renderer.render(scene,camera);
 }
@@ -211,6 +252,7 @@ async function boot(){
   window.__dante=Object.assign(window.__dante||{},{dante,kiara});
 }
 boot().catch(err=>Loader.fail(err));
-window.__dante={ai,setState,POSES,stats,world,camera,controls,cmdNight,setNight,cmdVisit,cmdFood,cmdWater,cmdTrick,ball,kiaraAI,kSet,doThrow,visit,training,achv,toggleKennelDoor,checkMedals};
+if('serviceWorker' in navigator && location.protocol==='https:') addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+window.__dante={TOYS,ai,setState,POSES,stats,world,camera,controls,cmdNight,setNight,cmdVisit,cmdFood,cmdWater,cmdTrick,ball,kiaraAI,kSet,doThrow,visit,training,achv,toggleKennelDoor,checkMedals};
 
 export { ray, ndc, groundPlane, lookPlane, tool, drag, setNDC, hitDog, throwVector, showPreview, hidePreview, doThrow, petTick, endDrag, HINTS, selectTool, updateTrickUI, MEDALS, checkMedals, renderAchv, svParts, svDateKey, clockT, updateClock, registerDay, fills, updateHUD, headWorld, updateBubble, fogDay, tmpC, updateDayNight, lastEnvN, snapshot, applySave, saveT, persist, resize, clock, hudT, medalT, camDelta, camGoal, frame };

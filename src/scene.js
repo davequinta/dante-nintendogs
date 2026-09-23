@@ -196,11 +196,13 @@ function furMaterial(color,len,layer,layers,opts={}){ const vertex=!!opts.vertex
     :new THREE.MeshStandardMaterial({color:c,roughness:0.92,alphaMap:FUR_TEX,alphaTest:0.5,side:THREE.DoubleSide,vertexColors:vertex});
   // el desplazamiento va DESPUÉS del skinning: así la capa sigue al hueso y objectNormal ya está deformada.
   // Cada capa: sale por la normal, cae por gravedad, fluye hacia atrás (dirección de crecimiento), se arrastra con la velocidad y se mece.
-  m.onBeforeCompile=sh=>{ sh.uniforms.uLayer={value:u}; sh.uniforms.uLen={value:len}; sh.uniforms.uTime=TIME; sh.uniforms.uDrag={value:0}; sh.uniforms.tDetail={value:FUR_DETAIL}; m.userData.uDrag=sh.uniforms.uDrag;
-    sh.vertexShader='uniform float uLayer,uLen,uTime,uDrag;\n'+(vertex?'attribute float furLen; varying float vLen;\n':'')+sh.vertexShader.replace('#include <skinning_vertex>',`#include <skinning_vertex>
+  m.onBeforeCompile=sh=>{ sh.uniforms.uLayer={value:u}; sh.uniforms.uLen={value:len}; sh.uniforms.uTime=TIME; sh.uniforms.uDrag={value:0}; sh.uniforms.tDetail={value:FUR_DETAIL}; sh.uniforms.uTouch={value:new THREE.Vector4(0,-9,0,0)}; sh.uniforms.uTouchDir={value:new THREE.Vector3(0,0,1)}; m.userData.uDrag=sh.uniforms.uDrag; m.userData.uTouch=sh.uniforms.uTouch; m.userData.uTouchDir=sh.uniforms.uTouchDir;
+    sh.vertexShader='uniform float uLayer,uLen,uTime,uDrag; uniform vec4 uTouch; uniform vec3 uTouchDir;\n'+(vertex?'attribute float furLen; varying float vLen;\n':'')+sh.vertexShader.replace('#include <skinning_vertex>',`#include <skinning_vertex>
       vec3 nrm=normalize(objectNormal); float d=uLayer*uLen${vertex?'*furLen':''}; ${vertex?'vLen=furLen;':''} vec3 down=normalize((vec4(0.0,-1.0,0.0,0.0)*modelMatrix).xyz);
       vec3 flow=normalize(vec3(0.0,-0.35,-1.0)); float q=uLayer*uLayer;
-      transformed+=nrm*d + down*d*q*0.5 + flow*d*q*0.6 + vec3(0.0,0.0,-1.0)*d*q*uDrag*0.18 + vec3(sin(uTime*2.1+position.y*7.0),0.0,cos(uTime*1.7+position.x*6.0))*d*q*0.10;`);
+      // la mano: aplasta las capas y las peina en la dirección del arrastre cerca del punto tocado
+      vec3 wpos=(modelMatrix*vec4(transformed,1.0)).xyz; float touch=uTouch.w*(1.0-smoothstep(0.0,0.3,distance(wpos,uTouch.xyz))); vec3 tdir=normalize((vec4(uTouchDir,0.0)*modelMatrix).xyz+vec3(1e-4));
+      transformed+=nrm*d*(1.0-touch*0.75) + down*d*q*0.5 + flow*d*q*0.6*(1.0-touch) + tdir*d*touch*1.4 + vec3(0.0,0.0,-1.0)*d*q*uDrag*0.18 + vec3(sin(uTime*2.1+position.y*7.0),0.0,cos(uTime*1.7+position.x*6.0))*d*q*0.10*(1.0-touch);`);
     sh.fragmentShader='uniform float uLayer; uniform sampler2D tDetail;\n'+(vertex?'varying float vLen;\n':'')+sh.fragmentShader
       .replace('#include <alphamap_fragment>',`#ifdef USE_ALPHAMAP
         ${vertex?'if(vLen<0.016) discard;':''}
@@ -264,6 +266,13 @@ function relocateFly(f){f.userData.c.set(rand(-5,5),rand(0.7,1.6),rand(-5,5));}
 const ballTex=canvasTex(256,128,(g,w,h)=>{g.fillStyle='#cfe94a';g.fillRect(0,0,w,h);for(let i=0;i<3000;i++){g.fillStyle=Math.random()<.5?'#bcd83a':'#dff36a';g.fillRect(Math.random()*w,Math.random()*h,2,2);}g.strokeStyle='#f4f0e0';g.lineWidth=9;g.beginPath();g.moveTo(0,20);g.bezierCurveTo(60,20,70,108,128,108);g.bezierCurveTo(186,108,196,20,256,20);g.stroke();});
 const ball={mesh:mesh(G.sph,new THREE.MeshStandardMaterial({map:ballTex,roughness:0.95}),[0,-5,0],[0.16,0.16,0.16]),vel:V3(),flying:false,held:false,rest:false,r:0.16,returnPt:V3(0,0,3)};
 ball.mesh.visible=false; scene.add(ball.mesh); for(let i=1;i<=3;i++){const f=new THREE.Mesh(G.sph,furMaterial(0xd6ee55,0.08,i,3));f.castShadow=false;ball.mesh.add(f);}
+// otros juguetes: frisbee (vuela plano y flota), mango (rueda irregular) y soga (tira y afloja); comparten la física de la pelota vía `toy`
+const frisbee=mesh(new THREE.CylinderGeometry(0.28,0.3,0.035,24),new THREE.MeshStandardMaterial({color:0xff5a3c,roughness:0.5}),[0,-5,0]); frisbee.visible=false; scene.add(frisbee);
+const mangoMesh=mesh(new THREE.SphereGeometry(1,16,12),new THREE.MeshStandardMaterial({color:0xf2a531,roughness:0.6}),[0,-5,0],[0.12,0.15,0.11]); mangoMesh.visible=false; scene.add(mangoMesh);
+const rope=(()=>{ const g=new THREE.Group(); g.visible=false; const m=new THREE.MeshStandardMaterial({color:0xd9c39a,roughness:1}); for(let i=0;i<7;i++){ const k=mesh(new THREE.TorusKnotGeometry(0.035,0.016,40,8,2,3),m,[0,0,i*0.06-0.18],[1,1,1],[Math.PI/2,0,i*0.6]); g.add(k); } g.userData.ends=[V3(0,0,-0.2),V3(0,0,0.2)]; scene.add(g); return g; })();
+const TOYS={ball:{mesh:ball.mesh,r:0.16,name:'Pelota',ic:'🎾'},frisbee:{mesh:frisbee,r:0.04,name:'Frisbee',ic:'🥏'},mango:{mesh:mangoMesh,r:0.15,name:'Mango',ic:'🥭'},rope:{mesh:rope,r:0.1,name:'Soga',ic:'🪢'}};
+// manguera para bañarlo: chorro de gotas desde la punta que sigue al cursor
+const hose=(()=>{ const g=new THREE.Group(); g.visible=false; g.add(mesh(new THREE.CylinderGeometry(0.03,0.035,0.5,10),M(0x2f8f3f),[0,0,0],[1,1,1],[Math.PI/2,0,0])); g.add(mesh(new THREE.CylinderGeometry(0.045,0.03,0.12,10),M(0xd8d8d8,{metalness:0.6,roughness:0.4}),[0,0,0.3],[1,1,1],[Math.PI/2,0,0])); scene.add(g); return g; })();
 const previewDots=[];{const m=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.65});for(let i=0;i<16;i++){const d=new THREE.Mesh(G.lsph,m);d.scale.setScalar(0.06);d.visible=false;d.userData.noAO=true;scene.add(d);previewDots.push(d);}}
 
 // partículas (sprites con texturas dibujadas en canvas)
@@ -274,13 +283,15 @@ const Particles=(()=>{
     z:canvasTex(64,64,(g)=>{g.fillStyle='#6fa7ff';g.font='bold 54px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('z',32,34);}),
     tear:canvasTex(64,64,(g)=>{g.fillStyle='#8fd0ff';g.beginPath();g.moveTo(32,6);g.bezierCurveTo(50,30,52,52,32,58);g.bezierCurveTo(12,52,14,30,32,6);g.fill();}),
     spark:canvasTex(64,64,(g)=>{g.fillStyle='#ffe66b';g.beginPath();for(let i=0;i<8;i++){const a=i*Math.PI/4,r=i%2?10:30;g.lineTo(32+Math.cos(a)*r,32+Math.sin(a)*r);}g.closePath();g.fill();}),
+    drop:canvasTex(64,64,(g)=>{g.fillStyle='rgba(140,200,255,.9)';g.beginPath();g.ellipse(32,32,9,14,0,0,Math.PI*2);g.fill();g.fillStyle='rgba(255,255,255,.8)';g.beginPath();g.arc(28,26,3,0,Math.PI*2);g.fill();}),
+    bubble:canvasTex(64,64,(g)=>{g.strokeStyle='rgba(255,255,255,.85)';g.lineWidth=3;g.beginPath();g.arc(32,32,24,0,Math.PI*2);g.stroke();g.fillStyle='rgba(255,255,255,.35)';g.beginPath();g.arc(24,24,7,0,Math.PI*2);g.fill();}),
     dust:canvasTex(64,64,(g)=>{const r=g.createRadialGradient(32,32,4,32,32,30);r.addColorStop(0,'rgba(200,180,140,.7)');r.addColorStop(1,'rgba(200,180,140,0)');g.fillStyle=r;g.fillRect(0,0,64,64);}),
     note:canvasTex(64,64,(g)=>{g.fillStyle='#ff9f3f';g.font='bold 50px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('♪',32,34);}),
   };
-  const pool=[];for(let i=0;i<70;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex.heart,transparent:true,depthWrite:false}));s.visible=false;s.userData={life:0,vel:V3()};scene.add(s);pool.push(s);}
+  const pool=[];for(let i=0;i<140;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex.heart,transparent:true,depthWrite:false}));s.visible=false;s.userData={life:0,vel:V3()};scene.add(s);pool.push(s);}
   function spawn(type,pos,opt={}){const s=pool.find(p=>!p.visible);if(!s)return;s.material.map=tex[type];s.position.copy(pos);s.visible=true;const u=s.userData;u.life=u.max=opt.life||1.2;u.vel.set(rand(-.5,.5),rand(.6,1.4),rand(-.5,.5)).multiplyScalar(opt.speed||1);if(opt.vel)u.vel.copy(opt.vel);u.size=opt.size||0.28;u.grav=opt.grav||0;s.scale.setScalar(u.size);}
   function update(dt){for(const s of pool){if(!s.visible)continue;const u=s.userData;u.life-=dt;if(u.life<=0){s.visible=false;continue;}u.vel.y-=u.grav*dt;s.position.addScaledVector(u.vel,dt);const k=u.life/u.max;s.material.opacity=Math.min(1,k*2);s.scale.setScalar(u.size*(0.6+0.4*k));}}
   return {spawn,update};
 })();
 
-export { QUALITY, LITE, sky, FIN_TEX, SKIN_TEX, finMaterial, canvas, renderer, MOBILE, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, M, G, noiseCanvas, bumpTex, skyUniforms, skyMat, skyDome, pmrem, rebuildEnv, mesh, canvasTex, grassTex, grassBump, tileDraw, tileTex, tileBump, tileMat, ground, terrace, walkway, grassBlades, stuccoBump, brickTex, wallMat, wallMat2, brickMat, walls, gate, barMat, kennel, kennelDoor, kennelDoorMeshes, KIARA_BED, HOUSE_DOOR, FUR_TEX, FUR_LAYERS, furMatCache, furMaterial, bowls, kibbleMat, waterMat, bowl, foodBowl, waterBowl, kibble, waterMesh, leafBump, potMat, leafMat, leafMat2, foliage, pot, sunBall, clouds, stars, visitor, flies, relocateFly, ballTex, ball, previewDots, Particles };
+export { frisbee, mangoMesh, rope, TOYS, hose, QUALITY, LITE, sky, FIN_TEX, SKIN_TEX, finMaterial, canvas, renderer, MOBILE, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, M, G, noiseCanvas, bumpTex, skyUniforms, skyMat, skyDome, pmrem, rebuildEnv, mesh, canvasTex, grassTex, grassBump, tileDraw, tileTex, tileBump, tileMat, ground, terrace, walkway, grassBlades, stuccoBump, brickTex, wallMat, wallMat2, brickMat, walls, gate, barMat, kennel, kennelDoor, kennelDoorMeshes, KIARA_BED, HOUSE_DOOR, FUR_TEX, FUR_LAYERS, furMatCache, furMaterial, bowls, kibbleMat, waterMat, bowl, foodBowl, waterBowl, kibble, waterMesh, leafBump, potMat, leafMat, leafMat2, foliage, pot, sunBall, clouds, stars, visitor, flies, relocateFly, ballTex, ball, previewDots, Particles };

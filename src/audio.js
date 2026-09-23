@@ -2,7 +2,10 @@ import { rand } from './utils.js';
 
 // ---------- AUDIO (sintetizado con Web Audio)
 const Audio=(()=>{
-  let ctx=null,master=null,noise=null,muted=false;
+  let ctx=null,master=null,noise=null,muted=false; const clips={}; let clipsTried=false;
+  // clips reales de Dante (opcionales): public/audio/bark.mp3, whine.mp3, howl.mp3, pant.mp3, growl.mp3. Si no están, se sintetiza.
+  function loadClips(){ if(clipsTried||!ctx)return; clipsTried=true; fetch('./audio/clips.json').then(r=>r.ok?r.json():[]).then(list=>{ for(const n of list){ fetch(`./audio/${n}.mp3`).then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(b=>ctx.decodeAudioData(b)).then(buf=>{clips[n]=buf;}).catch(()=>{}); } }).catch(()=>{}); }
+  function playClip(n,rate=1,gain=1){ const b=clips[n]; if(!b)return false; const s=ctx.createBufferSource(); s.buffer=b; s.playbackRate.value=rate; const g=ctx.createGain(); g.gain.value=gain; s.connect(g).connect(master); s.start(); return true; }
   function ensure(){
     if(!ctx){
       const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
@@ -10,7 +13,7 @@ const Audio=(()=>{
       const len=ctx.sampleRate; noise=ctx.createBuffer(1,len,ctx.sampleRate);
       const d=noise.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
     }
-    if(ctx.state==='suspended') ctx.resume();
+    if(ctx.state==='suspended') ctx.resume(); loadClips();
   }
   const ok=()=>ctx&&!muted&&ctx.state==='running';
   function env(g,t,a,d,peak){g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+d);}
@@ -27,19 +30,19 @@ const Audio=(()=>{
   }
   return {
     ensure, get muted(){return muted;}, toggle(){muted=!muted;return muted;},
-    bark(p=1){ if(!ok())return; const t=ctx.currentTime,pv=p*rand(0.94,1.06);
+    bark(p=1){ if(!ok())return; if(playClip('bark',p*rand(0.95,1.05),0.9))return; const t=ctx.currentTime,pv=p*rand(0.94,1.06);
       // "guau": sube rápido y cae, con dos formantes (garganta + hocico)
       const o=ctx.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(180*pv,t);o.frequency.exponentialRampToValueAtTime(340*pv,t+0.05);o.frequency.exponentialRampToValueAtTime(120*pv,t+0.24);
       const f1=ctx.createBiquadFilter();f1.type='bandpass';f1.frequency.value=520*pv;f1.Q.value=2.2; const f2=ctx.createBiquadFilter();f2.type='bandpass';f2.frequency.value=1250*pv;f2.Q.value=3;
       const g1=ctx.createGain(),g2=ctx.createGain();env(g1,t,0.012,0.22,0.9);env(g2,t,0.012,0.16,0.5);
       o.connect(f1).connect(g1).connect(master);o.connect(f2).connect(g2).connect(master);o.start(t);o.stop(t+0.3);
       burst(0.07,0.3,1600,'bandpass',0.8); },
-    howl(){ if(!ok())return; const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='triangle';
+    howl(){ if(!ok())return; if(playClip('howl',1,0.8))return; const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='triangle';
       o.frequency.setValueAtTime(320,t);o.frequency.exponentialRampToValueAtTime(620,t+0.5);o.frequency.setValueAtTime(620,t+1.2);o.frequency.exponentialRampToValueAtTime(380,t+2.1);
       const l=ctx.createOscillator();l.frequency.value=5.5;const lg=ctx.createGain();lg.gain.value=18;l.connect(lg).connect(o.frequency);l.start(t);l.stop(t+2.2);
       const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=1500;env(g,t,0.25,1.9,0.22);o.connect(f).connect(g).connect(master);o.start(t);o.stop(t+2.3); },
     yip(){ if(!ok())return; tone('square',650,950,0.12,0.25,{type:'lowpass',f:1800}); },
-    whine(){ if(!ok())return; const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';
+    whine(){ if(!ok())return; if(playClip('whine',rand(0.95,1.05),0.7))return; const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';
       o.frequency.setValueAtTime(600,t);o.frequency.linearRampToValueAtTime(1150,t+0.35);o.frequency.linearRampToValueAtTime(700,t+0.9);
       const l=ctx.createOscillator();l.frequency.value=9;const lg=ctx.createGain();lg.gain.value=40;l.connect(lg).connect(o.frequency);l.start(t);l.stop(t+1);
       env(g,t,0.08,0.85,0.22);o.connect(g).connect(master);o.start(t);o.stop(t+1); },
@@ -52,9 +55,9 @@ const Audio=(()=>{
       env(g,t,0.2,0.9,0.16);o.connect(f).connect(g).connect(master);o.start(t);o.stop(t+1.25); burst(0.5,0.05,260,'lowpass'); },
     sigh(){ if(!ok())return; burst(0.6,0.07,700,'bandpass',0.6); },
     snap(){ if(!ok())return; burst(0.03,0.4,2400,'bandpass',1.5); tone('square',220,90,0.05,0.2); },
-    growl(){ if(!ok())return; tone('sawtooth',110,80,0.6,0.25,{type:'lowpass',f:420}); },
+    growl(){ if(!ok())return; if(playClip('growl',1,0.7))return; tone('sawtooth',110,80,0.6,0.25,{type:'lowpass',f:420}); },
     chime(){ if(!ok())return; [880,1175,1568].forEach((f,i)=>setTimeout(()=>tone('sine',f,f,0.35,0.18),i*90)); },
-    pant(){ if(!ok())return; burst(0.08,0.06,1200,'bandpass'); },
+    pant(){ if(!ok())return; if(playClip('pant',1,0.4))return; burst(0.08,0.06,1200,'bandpass'); },
   };
 })();
 

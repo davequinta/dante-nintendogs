@@ -1,7 +1,7 @@
 import { clamp, damp, rand, pick, angleDiff, angleLerp, $, V3, B, WALL, KENNEL_POS, KENNEL_DIR, BOWL_FOOD, BOWL_WATER, GATE_SPOT } from './utils.js';
 import { Audio } from './audio.js';
-import { stats, world, TRICKS, training, achv, addStat } from './state.js';
-import { camera, controls, gate, KIARA_BED, HOUSE_DOOR, kibble, waterMesh, visitor, flies, relocateFly, ball, Particles } from './scene.js';
+import { stats, world, TRICKS, training, achv, addStat, diary, ageInfo } from './state.js';
+import { camera, controls, gate, KIARA_BED, HOUSE_DOOR, kibble, waterMesh, visitor, flies, relocateFly, ball, Particles, TOYS, frisbee, mangoMesh, rope, hose } from './scene.js';
 import { POSES, dante, kiara } from './dog.js';
 import { updateTrickUI, checkMedals } from './main.js';
 
@@ -34,6 +34,13 @@ const SAY={
   scolded:['perdón Kiara 😳','ya ya, me voy','*orejas atrás*','no me gruñas...'],
   jump:['¡SALTO!','¡vuelo!'],speak:['¡GUAU!','¡GUAU GUAU!'],roll:['*rueda con estilo*','¿viste eso?'],
   thanks:['gracias 🥹','ahora sí duermo'],
+  bath:['¡NO! ¡agua no!','*se sacude* 💦','bueno... está fresquita','¡me mojás el pelo de campeón!'],
+  shake:['*SACUDIDA*','¡ja! te mojé'],
+  tug:['¡MÍA! grrr','no la suelto','*tira con todo*','¡gané!'],
+  frisbee:['¡lo agarré en el aire!','¡soy un atleta!'],
+  mangoRoll:['¡MANGO! ¡corre!','¡mango rodante!'],
+  kiaraJealous:['¿y yo qué?','ella no es campeona...','*mira celoso*','yo también quiero'],
+  kiaraPeace:['hoy estamos en paz','*se echa cerca de Kiara*'],
 };
 const bubble={el:$('#bubble'),t:0,gap:0};
 function say(cat,dur=2.6,force=false){ if(bubble.gap>0&&!force)return; const txt=typeof cat==='string'&&SAY[cat]?pick(SAY[cat]):cat; bubble.el.textContent=txt; bubble.el.classList.add('show'); bubble.t=dur; bubble.gap=dur+1.2; }
@@ -42,7 +49,7 @@ function toast(msg,dur=2.4){ toastEl.textContent=msg; toastEl.classList.add('sho
 function updateToast(dt){ toastT-=dt; if(toastT<0) toastEl.classList.remove('show'); }
 
 // ---------- DOG AI (máquina de estados)
-const FREE=new Set(['stand','sit','lie','wander','scratch','yawn','fly','fetch_done','pet','bellyup','trick','kiara','groom']);
+const FREE=new Set(['stand','sit','lie','wander','scratch','yawn','fly','fetch_done','pet','bellyup','trick','kiara','groom','shake','jealous','peace']);
 const ai={state:'stand',t:0,dur:2,target:V3(),petting:false,petZone:null,petT:0,calm:0,cryT:0,barkT:0,sayT:6,chompT:0,spun:0,trick:null,obeys:true,disobey:null,snoreT:0,wakeT:0,afterPet:0};
 const visit={active:false,t:0,phase:'none'};
 const kiaraAI={active:false,state:'away',t:0,next:rand(35,60),target:V3(),dur:0,scoldCd:0,stay:0};
@@ -88,7 +95,7 @@ function onEnter(s){
     case 'eat': D.setPose(POSES.eat); say('eat'); break;
     case 'drink': D.setPose(POSES.eat,{mouth:0.2}); say('drink'); break;
     case 'fetch_return': D.setPose(POSES.stand,{mouth:0.4,tailLift:0.7}); say('fetch'); break;
-    case 'fetch_done': D.setPose(POSES.sit); D.pant=true; say('fetch',2.6,true); addStat('felicidad',12); addStat('energia',-8); Audio.yip(); achv.fetches++; checkMedals(); break;
+    case 'fetch_done': D.setPose(POSES.sit); D.pant=true; say(world.toy==='frisbee'?'frisbee':world.toy==='mango'?'mangoRoll':'fetch',2.6,true); addStat('felicidad',12); addStat('energia',-8); Audio.yip(); achv.fetches++; if(world.toy==='frisbee')achv.frisbees++; if(world.toy==='mango'){ achv.mangos++; addStat('hambre',6); } diary(world.toy==='frisbee'?'Atrapó el frisbee':world.toy==='mango'?'Persiguió un mango':'Trajo la pelota'); checkMedals(); break;
     case 'bark': D.setPose(POSES.bark); ai.barkT=0; ai.calm=0; break;
     case 'calm': D.setPose(POSES.sit,{tongue:1,earBack:0.3}); D.pant=true; say('calm',2.6,true); addStat('felicidad',8); break;
     case 'cry': D.setPose(POSES.cry); ai.cryT=18; say('cry',2.6,true); break;
@@ -115,6 +122,10 @@ function onEnter(s){
     case 'kiara': D.setPose(POSES.alert,{earAlert:1}); say('kiara',2.6,true); break;
     case 'groom': D.setPose(POSES.stand,{eyes:0.35,neckPitch:-0.1}); achv.brushes++; break;
     case 'eat_mango': D.setPose(POSES.sit,{neckPitch:-0.3,mouth:0.6}); say('mango',2.6,true); D.pant=false; break;
+    case 'shake': D.setPose(POSES.stand,{earBack:0.4,eyes:0.3}); say('shake',1.8,true); ai.shakeT=1.4; Audio.sigh(); break;
+    case 'tug': D.setPose(POSES.stand,{mouth:0.55,neckPitch:0.35,earBack:0.5,tailLift:0.6,rlU:0.2,rrU:0.2,bodyPitch:0.15}); say('tug',2,true); ai.tugPull=0; ai.tugWin=0; Audio.growl(); break;
+    case 'jealous': D.setPose(POSES.sit,{earBack:0.6,eyes:0.7,neckPitch:-0.1}); say('kiaraJealous',2.4,true); break;
+    case 'peace': D.setPose(POSES.lie,{neckPitch:0.2,eyes:0.7}); say('kiaraPeace',2.4,true); break;
   }
 }
 function lookAtPoint(pt,dt,maxYaw=0.9){ // gira la cabeza hacia un punto del mundo
@@ -175,7 +186,7 @@ function updateAI(dt){
     case 'bark': { stopMoving(dt); faceTo(visitor.position,dt); lookAtPoint(visitor.position,dt,0.6);
       ai.barkT-=dt; if(ai.barkT<0){ ai.barkT=rand(0.35,0.7); Audio.bark(rand(0.9,1.1)); D.target.bodyY=0.1; D.target.mouth=0.9; setTimeout(()=>{D.target.bodyY=0;},90); if(Math.random()<0.5) say('visit',1.6); }
       if(ai.petting){ ai.calm+=dt; if(ai.calm>1.2&&Math.random()<dt*0.7) say('...ok... ok...',1.2); } else ai.calm=Math.max(0,ai.calm-dt*0.5);
-      if(ai.calm>(visit.calmNeed||3.2)||ai.t>60){ if(ai.calm>(visit.calmNeed||3.2)){achv.visits++;checkMedals();} endVisit(); setState('calm',{dur:4}); } break; }
+      if(ai.calm>(visit.calmNeed||3.2)||ai.t>60){ if(ai.calm>(visit.calmNeed||3.2)){achv.visits++;diary('Llegó una visita y se calmó');checkMedals();} endVisit(); setState('calm',{dur:4}); } break; }
     case 'calm': stopMoving(dt); if(ai.t>ai.dur) chooseIdle(); break;
     case 'to_kennel': { const entry=KENNEL_POS.clone().addScaledVector(KENNEL_DIR,1.7), inside=KENNEL_POS.clone().addScaledVector(KENNEL_DIR,0.05);
       if(!ai.inside){ if(steer(dt,entry,1.6,0.3)) ai.inside=true; } else { D.target.neckPitch=0.35; if(steer(dt,inside,0.9,0.15)) setState(world.kennelClosed?'cry':'kennel_rest'); } break; }
@@ -203,7 +214,19 @@ function updateAI(dt){
       if(d<(ai.scolded?3.2:2.4)){ const away=p.clone().sub(kp); away.y=0; away.normalize(); steer(dt,p.clone().addScaledVector(away,2.2),ai.scolded?2.6:1.8,0.3); } else { stopMoving(dt); faceTo(kp,dt,2); }
       if(!kiaraAI.active||d>4.5||(ai.scolded&&ai.t>4)) chooseIdle(); break; }
     case 'groom': stopMoving(dt); if(!ai.petting&&ai.afterPet<=0) chooseIdle(); break;
+    case 'shake': { stopMoving(dt); ai.shakeT-=dt; const k=Math.sin(ai.t*38); D.target.bodyRoll=k*0.28; D.target.headRoll=-k*0.5; D.target.earBack=0.4+Math.abs(k)*0.3;
+      if(world.wet>0.05&&Math.random()<dt*40){ const p=D.body.getWorldPosition(V3()); Particles.spawn('drop',p.add(V3(rand(-.3,.3),rand(-.1,.4),rand(-.5,.5))),{life:0.7,speed:2.2,size:0.12,grav:6}); }
+      world.wet=Math.max(0,world.wet-dt*0.9); if(ai.shakeT<=0){ D.target.bodyRoll=0; D.target.headRoll=0; chooseIdle(); } break; }
+    case 'tug': { stopMoving(dt); const pull=ai.tugPull; D.target.bodyPitch=0.15+pull*0.2; D.target.neckPitch=0.35+Math.sin(ai.t*6)*0.12*(1+pull); D.target.headRoll=Math.sin(ai.t*9)*0.25;
+      dante.heading=angleLerp(dante.heading,Math.atan2(camera.position.x-p.x,camera.position.z-p.z),1-Math.exp(-3*dt));
+      if(Math.random()<dt*0.7) Audio.growl(); ai.tugPull=Math.max(0,pull-dt*0.5);
+      if(ai.tugWin>=3){ addStat('felicidad',10); addStat('energia',-6); achv.tugs++; diary('Jugó a la soga y ganó'); say('¡gané!',1.8,true); Audio.yip(); rope.visible=false; setState('fetch_done',{dur:2.5}); }
+      else if(ai.t>25){ rope.visible=false; chooseIdle(); } break; }
+    case 'jealous': stopMoving(dt); lookAtPoint(kiara.root.position,dt,1.2); if(ai.t>3.5) chooseIdle(); break;
+    case 'peace': stopMoving(dt); if(Math.random()<dt*0.15) Audio.sigh(); if(ai.t>ai.dur||!kiaraAI.active) chooseIdle(); break;
   }
+  // mojado: sube limpieza mientras cae agua, y cuando termina se sacude
+  if(world.wet>0){ if(!ai.hoseOn){ ai.dryT=(ai.dryT||0)+dt; if(ai.dryT>1.2&&FREE.has(ai.state)&&ai.state!=='shake'){ ai.dryT=0; setState('shake'); } } else ai.dryT=0; }
   ai.afterPet=Math.max(0,ai.afterPet-dt);
   if(ai.state!=='fetch_chase'&&ai.state!=='to_gate') D.pant=D.pant||(ai.state==='fetch_done');
   const tailTop=(ai.state==='cry'||ai.state==='sleep')?0:stats.felicidad/100;
@@ -214,7 +237,7 @@ function updateAI(dt){
 
 // ---------- comandos desde la UI
 function busyAtNight(){ if(world.night){ toast('Dante está en su kennel 💤 (apagá la noche primero)'); return true; } return false; }
-function cmdFood(){ if(busyAtNight())return; world.food=1; achv.feeds++; kibble.visible=true; kibble.scale.y=1; Audio.yip(); toast('Plato lleno de Royal Canin 🍖'); if(FREE.has(ai.state)||ai.state==='drink') setState('goto_eat'); }
+function cmdFood(){ if(busyAtNight())return; world.food=1; achv.feeds++; diary('Comió Royal Canin'); kibble.visible=true; kibble.scale.y=1; Audio.yip(); toast('Plato lleno de Royal Canin 🍖'); if(FREE.has(ai.state)||ai.state==='drink') setState('goto_eat'); }
 function cmdWater(){ if(busyAtNight())return; world.water=1; waterMesh.visible=true; toast('Plato con agua fresca 💧'); if(FREE.has(ai.state)||ai.state==='eat') setState('goto_drink'); }
 const TRICK_DUR={sit:3.2,platz:3.2,paw:3.2,show:4.8,roll:3.0,jump:1.8,speak:2.4};
 function cmdTrick(tr){ if(busyAtNight())return; if(ai.state==='bark'||ai.state==='to_gate'){toast('¡Está ladrando! Acariciálo para calmarlo');return;}
@@ -223,16 +246,30 @@ function cmdTrick(tr){ if(busyAtNight())return; if(ai.state==='bark'||ai.state==
   const obeys=stats.felicidad>35||Math.random()<0.45;
   if(!obeys){ const d=pick(['bellyup','bark','walkaway']); setState('disobey',{disobey:d,dur:3,target:V3(rand(-B+1,B-1),0,rand(-B+1,B-1))}); return; }
   const m=training[tr], pOk=0.35+0.62*(m/100); achv.tricks++; ai.lastTrick=tr; ai.lastTrickT=world.time;
-  if(Math.random()<pOk){ training[tr]=Math.min(100,m+(m<50?9:5)); setState('trick',{trick:tr,dur:TRICK_DUR[tr]}); }
+  if(Math.random()<pOk){ training[tr]=Math.min(100,m+(m<50?9:5)); if(training[tr]>=100&&m<100) diary(`Dominó el truco ${TRICKS[tr]}`); setState('trick',{trick:tr,dur:TRICK_DUR[tr]}); }
   else { training[tr]=Math.min(100,m+3); setState('trick_fail',{trick:tr,dur:2.6}); }
   updateTrickUI(); checkMedals();
 }
+// ---------- juguetes: qué se lanza depende de world.toy; el frisbee vuela plano, el mango rueda, la soga es tira y afloja
+function toyMesh(){ return TOYS[world.toy].mesh; }
+function cmdTug(){ if(busyAtNight())return; if(ai.state==='tug'){ ai.tugPull=Math.min(1,ai.tugPull+0.45); ai.tugWin++; addStat('felicidad',1.5); Audio.snap(); const m=dante.mouthPos(); Particles.spawn('dust',V3(m.x,0.1,m.z),{life:0.5,speed:0.4,size:0.3}); return; }
+  if(!FREE.has(ai.state)) return; const spot=playerSpot(); rope.visible=true; rope.position.copy(spot).add(V3(0,0.45,0)); setState('tug'); }
+// ---------- baño con manguera: el chorro sigue al cursor, moja y limpia; al terminar se sacude
+function hoseTick(point,dt){ ai.hoseOn=true; ai.hoseOff=0; hose.visible=true; const cp=camera.position; hose.position.set(cp.x,cp.y-0.55,cp.z).addScaledVector(V3().subVectors(point,cp).normalize(),0.9); hose.lookAt(point);
+  for(let i=0;i<3;i++){ const t=Math.random(); const pt=V3().lerpVectors(hose.position,point,t); Particles.spawn('drop',pt.add(V3(rand(-.05,.05),rand(-.05,.05),rand(-.05,.05))),{life:0.35,speed:0.2,size:0.09,grav:9,vel:V3().subVectors(point,hose.position).multiplyScalar(2.2)}); }
+  const d=point.distanceTo(dante.body.getWorldPosition(V3())); if(d<0.9){ world.wet=Math.min(1,world.wet+dt*0.35); addStat('limpieza',dt*9); if(Math.random()<dt*6) Particles.spawn('bubble',point.clone().add(V3(rand(-.2,.2),0.1,rand(-.2,.2))),{life:1.2,speed:0.5,size:0.16});
+    if(FREE.has(ai.state)&&ai.state!=='groom'){ setState('groom'); say('bath',2.2,true); } ai.petting=true; ai.afterPet=0.6; if(!ai.bathCounted){ ai.bathCounted=true; achv.baths++; diary('Se bañó con la manguera'); } }
+  else if(Math.random()<dt*3) Particles.spawn('drop',point.clone(),{life:0.5,speed:0.6,size:0.1,grav:4}); }
+function hoseEnd(){ ai.hoseOn=false; hose.visible=false; ai.bathCounted=false; }
+// ---------- Kiara acariciable: celos de Dante si le hacés mucho caso, y ratos de paz
+function petKiara(hit){ if(!kiaraAI.active) return false; achv.kiaraPets++; kiaraAI.petT=(kiaraAI.petT||0)+1; kiara.target.eyes=0.35; kiara.target.tailLift=0.4; if(Math.random()<0.4) Particles.spawn('heart',hit.point.clone().add(V3(0,0.1,0)),{life:1,speed:0.6,size:0.2});
+  if(kiaraAI.petT%12===0&&FREE.has(ai.state)&&ai.state!=='jealous'&&Math.random()<0.7){ setState('jealous'); addStat('felicidad',-2); } if(kiaraAI.petT===20) diary('Acarició a Kiara y Dante se puso celoso'); return true; }
 function cmdVisit(){ if(busyAtNight())return; if(visit.active){toast('Ya hay alguien en la puerta');return;} visit.active=true; visit.t=0; visit.phase='arrive'; visit.calmNeed=rand(2.4,4.6);
   const u=visitor.userData; u.shirt.material.color.setHex(pick([0xe0503e,0x3b7dd8,0x3aa35b,0xf2c14e,0x8e5bd6,0xffffff])); u.skin.forEach(m=>m.material.color.setHex(pick([0xd9a074,0xb97a4e,0x8d5a3a,0xf0c8a0]))); u.hat.visible=Math.random()<0.5; u.hat.material.color.setHex(pick([0x6a4a2a,0x222222,0xd8d8d8]));
   visitor.visible=true; visitor.position.set(0,0,10.5); Audio.bark(); setState('to_gate'); }
 function endVisit(){ visit.phase='leave'; }
 function setNight(on,auto=false){ if(world.night===on)return; world.night=on; $('[data-action=night]').classList.toggle('on',on);
-  if(on){ toast(auto?'Anocheció en El Salvador 🌙 Dante va a su kennel':'Buenas noches 🌙 Dante va a su kennel'); achv.nights++; if(ball.held){ball.held=false;ball.rest=true;ball.mesh.position.y=ball.r;} if(visit.active) endVisit(); setState('to_kennel',{inside:false}); }
+  if(on){ toast(auto?'Anocheció en El Salvador 🌙 Dante va a su kennel':'Buenas noches 🌙 Dante va a su kennel'); achv.nights++; diary('Se fue a dormir al kennel'); if(ball.held){ball.held=false;ball.rest=true;ball.mesh.position.y=ball.r;} if(visit.active) endVisit(); setState('to_kennel',{inside:false}); }
   else { toast(auto?'Amaneció en El Salvador ☀️':'¡Buenos días! ☀️');
     const inKennel=ai.state==='sleep'||ai.state==='cry'||ai.state==='to_kennel'||ai.state==='kennel_rest';
     if(inKennel){ if(world.kennelClosed){ setState('cry',{wantOut:true,cryT:9999}); } else { dante.root.position.copy(KENNEL_POS).addScaledVector(KENNEL_DIR,1.9); dante.heading=Math.PI/4; setState('wake'); addStat('felicidad',5); } } }
@@ -260,7 +297,9 @@ function updateKiara(dt){ const k=kiaraAI, K=kiara, p=K.root.position;
     case 'enter': if(steerDog(K,dt,V3(HOUSE_DOOR.x+0.6,0,-3.6),0.95,0.4)) kNext(); break;
     case 'wander': if(steerDog(K,dt,k.target,0.95,0.4)||k.t>14) kNext(); break;
     case 'toBed': if(steerDog(K,dt,KIARA_BED,0.9,0.35)) kSet('lie',{dur:rand(20,40)}); break;
-    case 'lie': K.speed=damp(K.speed,0,8,dt); K.heading=angleLerp(K.heading,Math.PI/2,1-Math.exp(-2*dt)); if(Math.random()<dt*0.08)Audio.sigh(); if(k.t>k.dur) kNext(); break;
+    case 'lie': K.speed=damp(K.speed,0,8,dt); K.heading=angleLerp(K.heading,Math.PI/2,1-Math.exp(-2*dt)); if(Math.random()<dt*0.08)Audio.sigh();
+      if(k.t>6&&stats.felicidad>60&&FREE.has(ai.state)&&ai.state!=='peace'&&Math.random()<dt*0.05){ const spot=KIARA_BED.clone().add(V3(1.6,0,0.4)); setState('wander',{target:spot}); setTimeout(()=>{ if(dante.root.position.distanceTo(spot)<0.8) setState('peace',{dur:rand(8,14)}); },4500); k.scoldCd=20; diary('Se echó en paz cerca de Kiara'); }
+      if(k.t>k.dur) kNext(); break;
     case 'toWater': if(steerDog(K,dt,bowlApproach(BOWL_WATER),0.95,0.3)) kSet('drink',{dur:4}); break;
     case 'drink': K.speed=damp(K.speed,0,8,dt); K.heading=angleLerp(K.heading,Math.atan2(BOWL_WATER.x-p.x,BOWL_WATER.z-p.z),1-Math.exp(-5*dt)); K.target.neckPitch=1.15+Math.sin(k.t*14)*0.1; if(Math.random()<dt*5)Audio.lap(); world.water=Math.max(0,world.water-dt*0.05); if(k.t>k.dur||world.water<=0) kNext(); break;
     case 'scold': K.speed=damp(K.speed,0,8,dt); K.heading=angleLerp(K.heading,Math.atan2(dante.root.position.x-p.x,dante.root.position.z-p.z),1-Math.exp(-6*dt)); K.target.bodyY=k.t<0.3?0.08:0; if(k.t>2.0) kNext(); break;
@@ -275,15 +314,17 @@ function updateKiara(dt){ const k=kiaraAI, K=kiara, p=K.root.position;
 }
 function updateFlies(dt){ for(const f of flies){ const u=f.userData; u.t+=dt; f.visible=world.nightT<0.5; u.c.x+=Math.sin(u.t*0.7)*dt*0.6; u.c.z+=Math.cos(u.t*0.5)*dt*0.6; u.c.x=clamp(u.c.x,-6,6); u.c.z=clamp(u.c.z,-6,6);
   f.position.set(u.c.x+Math.sin(u.t*9)*0.5+Math.sin(u.t*2.3)*0.4,u.c.y+Math.sin(u.t*13)*0.15,u.c.z+Math.cos(u.t*7)*0.5); } }
-function updateBall(dt){ const m=ball.mesh;
-  if(ball.held){ m.visible=true; m.position.copy(dante.mouthPos()); return; }
+function updateBall(dt){ const m=ball.mesh; const toy=world.toy; const T=TOYS[toy]; const shown=ball.flying||ball.held||ball.rest;
+  // la malla visible es la del juguete elegido; la física sigue en `ball`. La soga no se lanza.
+  for(const k in TOYS){ const tm=TOYS[k].mesh; if(k==='rope') continue; if(k===toy){ tm.visible=shown; if(tm!==m){ tm.position.copy(m.position); tm.rotation.copy(m.rotation); if(k==='frisbee') tm.rotation.set(ball.flying?0.2:0,world.time*12,0); } } else tm.visible=false; }
+  if(ball.held){ m.position.copy(dante.mouthPos()); return; }
   if(!ball.flying) return;
-  ball.vel.y-=18*dt; m.position.addScaledVector(ball.vel,dt);
-  if(m.position.y<ball.r){ m.position.y=ball.r; if(Math.abs(ball.vel.y)>1.2){ ball.vel.y*=-0.55; ball.vel.x*=0.8; ball.vel.z*=0.8; Audio.boing(Math.min(1,Math.abs(ball.vel.y)/6)); } else ball.vel.y=0;
+  ball.vel.y-=(world.toy==='frisbee'?(ball.vel.y<0?5:14):18)*dt; if(world.toy==='frisbee'){ ball.vel.x*=1-0.15*dt; ball.vel.z*=1-0.15*dt; } m.position.addScaledVector(ball.vel,dt);
+  const rr=TOYS[world.toy].r; if(m.position.y<rr){ m.position.y=rr; if(world.toy==='mango'&&Math.random()<0.5) ball.vel.x+=rand(-0.6,0.6); if(Math.abs(ball.vel.y)>1.2){ ball.vel.y*=(world.toy==='frisbee'?-0.15:-0.55); ball.vel.x*=0.8; ball.vel.z*=0.8; Audio.boing(Math.min(1,Math.abs(ball.vel.y)/6)); } else ball.vel.y=0;
     const fr=Math.max(0,1-2.2*dt); ball.vel.x*=fr; ball.vel.z*=fr; }
   const lim=WALL-0.45; if(Math.abs(m.position.x)>lim){ m.position.x=Math.sign(m.position.x)*lim; ball.vel.x*=-0.6; Audio.boing(0.6);} if(Math.abs(m.position.z)>lim){ m.position.z=Math.sign(m.position.z)*lim; ball.vel.z*=-0.6; Audio.boing(0.6);}
   m.rotation.x+=ball.vel.z*dt*4; m.rotation.z-=ball.vel.x*dt*4;
-  if(ball.vel.length()<0.08&&m.position.y<=ball.r+0.001){ ball.flying=false; ball.rest=true; ball.vel.set(0,0,0); }
+  if(ball.vel.length()<0.08&&m.position.y<=TOYS[world.toy].r+0.001){ ball.flying=false; ball.rest=true; ball.vel.set(0,0,0); }
 }
 
-export { SAY, bubble, say, toastEl, toastT, toast, updateToast, FREE, ai, visit, kiaraAI, setState, playerSpot, bowlApproach, faceTo, steerDog, steer, stopMoving, chooseIdle, onEnter, lookAtPoint, cursor, updateAI, busyAtNight, cmdFood, cmdWater, TRICK_DUR, cmdTrick, cmdVisit, endVisit, setNight, cmdNight, toggleKennelDoor, updateKennelBtn, updateVisit, kSet, kNext, updateKiara, updateFlies, updateBall };
+export { cmdTug, hoseTick, hoseEnd, petKiara, toyMesh, SAY, bubble, say, toastEl, toastT, toast, updateToast, FREE, ai, visit, kiaraAI, setState, playerSpot, bowlApproach, faceTo, steerDog, steer, stopMoving, chooseIdle, onEnter, lookAtPoint, cursor, updateAI, busyAtNight, cmdFood, cmdWater, TRICK_DUR, cmdTrick, cmdVisit, endVisit, setNight, cmdNight, toggleKennelDoor, updateKennelBtn, updateVisit, kSet, kNext, updateKiara, updateFlies, updateBall };
