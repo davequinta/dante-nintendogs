@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { edgeTable, triTable } from 'three/addons/objects/MarchingCubes.js';
 import { clamp, lerp, damp, rand, V3 } from './utils.js';
-import { scene, MOBILE, FUR_LAYERS, furMaterial } from './scene.js';
+import { scene, MOBILE, FUR_LAYERS, furMaterial, canvasTex } from './scene.js';
 
 // ---------- DOG MODEL
 // El perro es UNA malla orgánica generada en código: el esqueleto (huesos de three) lleva "primitivas" de
@@ -12,10 +12,10 @@ const basePose=()=>({bodyY:0,bodyPitch:0,bodyRoll:0,neckPitch:0,headYaw:0,headPi
 const POSES={
   stand:{},
   alert:{earAlert:1,neckPitch:-0.2,tailLift:0.6},
-  sit:{bodyY:-0.2,bodyPitch:-0.55,flU:0.55,frU:0.55,rlU:-0.8,rlL:2.4,rrU:-0.8,rrL:2.4,neckPitch:-0.1,tailLift:-0.1},
-  lie:{bodyY:-0.42,flU:-0.72,flL:-0.78,frU:-0.72,frL:-0.78,rlU:-0.72,rlL:2.2,rrU:-0.72,rrL:2.2,neckPitch:0.15,tailLift:-0.1},
-  bellyUp:{bodyY:-0.36,bodyRoll:Math.PI,flU:0.5,flL:0.9,frU:0.6,frL:0.8,rlU:0.4,rlL:0.9,rrU:0.6,rrL:0.7,headRoll:0.5,neckPitch:-0.4,tongue:1,mouth:0.35,tailLift:0.3},
-  stack:{bodyY:-0.05,rrU:0.7,rrL:-0.5,rlU:-0.12,rlL:0.12,neckPitch:-0.4,headPitch:-0.1,earAlert:1,tailLift:-0.2,mouth:0.15},
+  sit:{bodyY:-0.2,bodyPitch:-0.55,flU:0.55,frU:0.55,rlU:-0.6,rlL:1.9,rrU:-0.6,rrL:1.9,neckPitch:-0.1,tailLift:-0.1},
+  lie:{bodyY:-0.42,flU:-0.72,flL:-0.78,frU:-0.72,frL:-0.78,rlU:-0.5,rlL:1.7,rrU:-0.5,rrL:1.7,neckPitch:0.15,tailLift:-0.1},
+  bellyUp:{bodyY:-0.36,bodyRoll:Math.PI,flU:0.5,flL:0.9,frU:0.6,frL:0.8,rlU:0.4,rlL:0.6,rrU:0.6,rrL:0.5,headRoll:0.5,neckPitch:-0.4,tongue:1,mouth:0.35,tailLift:0.3},
+  stack:{bodyY:-0.05,rrU:0.6,rrL:-0.4,rlU:-0.1,rlL:0.1,neckPitch:-0.4,headPitch:-0.1,earAlert:1,tailLift:-0.2,mouth:0.15},
   eat:{bodyPitch:0.22,bodyY:-0.06,neckPitch:1.15,headPitch:0.25,flU:-0.1,frU:-0.1,spread:0.22,mouth:0.3,rlU:0.15,rrU:0.15},
   bark:{neckPitch:-0.35,headPitch:-0.2,mouth:0.85,earAlert:1,tailLift:0.7,spread:0.2},
   stretch:{bodyPitch:0.38,bodyY:-0.12,flU:-1.25,flL:-0.1,frU:-1.25,frL:-0.1,rlU:0.3,rrU:0.3,neckPitch:0.45,mouth:0.5,eyes:0.2},
@@ -23,15 +23,17 @@ const POSES={
 POSES.sleep={...POSES.lie,neckPitch:0.55,headRoll:0.55,headYaw:0.45,eyes:0,earBack:0.5,tailLift:-0.2};
 POSES.cry={...POSES.lie,neckPitch:0.3,eyes:0.45,earBack:1,mouth:0.25};
 POSES.paw={...POSES.sit,flU:-1.15,flL:0.95,headRoll:0.15};
-POSES.scratch={...POSES.sit,rrU:-1.3,rrL:1.2,neckPitch:0.5,headYaw:0.6,headRoll:0.4,eyes:0.4};
+POSES.scratch={...POSES.sit,rrU:-1.1,rrL:0.9,neckPitch:0.5,headYaw:0.6,headRoll:0.4,eyes:0.4};
 
 const DANTE_COLORS={base:0xb35e26,light:0xcf8340,saddle:0x1d1a1a,mask:0x1a1717,fur:0xd8964e,nose:0x121010};
 const KIARA_COLORS={base:0xc9a266,light:0xdcb87c,saddle:0x8a6a3c,mask:0x3a2c22,fur:0xe6d2a2,nose:0x121010};
 
 const ZONES=['body','head','belly','tail'];
-const SMOOTH_K=0.035;        // radio de fusión entre primitivas
-const CELL=MOBILE?0.03:0.021;   // tamaño de celda del campo de distancia
-const BOUNDS={min:[-0.62,-0.08,-1.05],max:[0.62,1.85,1.35]};
+const SMOOTH_K=0.035;            // radio de fusión entre primitivas
+const CELL=MOBILE?0.03:0.017;    // tamaño de celda del campo de distancia
+const BOUNDS={min:[-0.62,-0.08,-1.1],max:[0.62,1.85,1.4]};
+// postura de reposo de las patas (radianes): traseras anguladas como un pastor alemán, con el pie plano compensando
+const REST={fl:[0.05,-0.08],fr:[0.05,-0.08],rl:[-0.32,0.78],rr:[-0.32,0.78]};
 
 // ---- funciones de distancia con signo (en el espacio local de cada primitiva)
 function sdfEllipsoid(x,y,z,s){ const qx=x/s[0],qy=y/s[1],qz=z/s[2]; const k0=Math.sqrt(qx*qx+qy*qy+qz*qz); if(k0<1e-6) return -Math.min(s[0],s[1],s[2]);
@@ -39,68 +41,92 @@ function sdfEllipsoid(x,y,z,s){ const qx=x/s[0],qy=y/s[1],qz=z/s[2]; const k0=Ma
 function sdfCapsule(x,y,z,r,h,rr){ const qx=Math.hypot(x,z)-r+rr, qy=Math.abs(y)-h+rr; const mx=Math.max(qx,0),my=Math.max(qy,0); return Math.min(Math.max(qx,qy),0)+Math.hypot(mx,my)-rr; }
 function sdfBox(x,y,z,e){ const qx=Math.abs(x)-e[0],qy=Math.abs(y)-e[1],qz=Math.abs(z)-e[2]; const mx=Math.max(qx,0),my=Math.max(qy,0),mz=Math.max(qz,0); return Math.hypot(mx,my,mz)+Math.min(Math.max(qx,qy,qz),0); }
 function primDist(P,x,y,z){ // x,y,z ya en espacio local de la primitiva
-  if(P.type==='sph') return sdfEllipsoid(x,y,z,P.scl);
+  if(P.type==='sph'||P.type==='cutsph') return sdfEllipsoid(x,y,z,P.scl);
   if(P.type==='cut') return sdfBox(x,y,z,P.ext);
-  if(P.type==='cutsph') return sdfEllipsoid(x,y,z,P.scl);
   return sdfCapsule(x,y,z,P.r,P.h,P.rr);
 }
+const shadowTex=canvasTex(128,128,(g,w,h)=>{const r=g.createRadialGradient(64,64,6,64,64,62);r.addColorStop(0,'rgba(0,0,0,.55)');r.addColorStop(0.6,'rgba(0,0,0,.22)');r.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=r;g.fillRect(0,0,w,h);});
 
 class Dog{
   constructor(colors,opt={}){
-    this.longHair=opt.longHair!==false; this.colors=colors;
+    this.longHair=opt.longHair!==false; this.colors=colors; this.id=opt.id||'dog';
     const C={B:colors.base,L:colors.light,S:colors.saddle,K:colors.mask,F:colors.fur};
     this.root=new THREE.Group();
-    // ---- esqueleto: mismos nombres y pivotes que usaba la versión de primitivas, así animate() no cambia
-    const bone=(name,parent,pos)=>{const b=new THREE.Bone();b.name=name;b.position.set(...pos);parent.add(b);this.bones.push(b);return b;};
+    // ---- esqueleto: mismos nombres y pivotes que la versión anterior, más un hueso de pie por pata
+    const bone=(name,parent,pos,rx=0)=>{const b=new THREE.Bone();b.name=name;b.position.set(...pos);b.rotation.x=rx;parent.add(b);this.bones.push(b);return b;};
     this.bones=[]; this.prims=[];
     this.mesh=new THREE.SkinnedMesh(new THREE.BufferGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.9})); this.root.add(this.mesh);
     this.body=bone('body',this.mesh,[0,0.78,0]);
-    this.neck=bone('neck',this.body,[0,0.12,0.42]); this.head=bone('head',this.neck,[0,0.36,0.30]); this.jaw=bone('jaw',this.head,[0,-0.1,0.13]);
+    this.neck=bone('neck',this.body,[0,0.14,0.44]); this.head=bone('head',this.neck,[0,0.38,0.30]); this.jaw=bone('jaw',this.head,[0,-0.1,0.13]);
     this.ears=[1,-1].map(s=>{const e=bone('ear'+s,this.head,[0.17*s,0.15,-0.05]);e.userData.side=s;return e;});
-    const leg=(n,x,z)=>{const up=bone(n+'Up',this.body,[x,0,z]);const knee=bone(n+'Knee',up,[0,-0.4,0]);return {up,knee};};
-    this.legs={fl:leg('fl',0.2,0.4),fr:leg('fr',-0.2,0.4),rl:leg('rl',0.2,-0.52),rr:leg('rr',-0.2,-0.52)};
-    this.tail=[]; let par=this.body; for(let i=0;i<5;i++){ par=bone('tail'+i,par,i===0?[0,0.08,-0.72]:[0,-0.17,0]); this.tail.push(par); }
+    const leg=(n,x,z,rear)=>{const r=REST[n];const up=bone(n+'Up',this.body,[x,0,z],r[0]);const knee=bone(n+'Knee',up,[0,rear?-0.39:-0.36,0],r[1]);const paw=bone(n+'Paw',knee,[0,rear?-0.35:-0.32,0],-(r[0]+r[1]));return {up,knee,paw,rear};};
+    this.legs={fl:leg('fl',0.2,0.42,false),fr:leg('fr',-0.2,0.42,false),rl:leg('rl',0.19,-0.52,true),rr:leg('rr',-0.19,-0.52,true)};
+    this.tail=[]; let par=this.body; for(let i=0;i<5;i++){ par=bone('tail'+i,par,i===0?[0,0.02,-0.74]:[0,-0.17,0]); this.tail.push(par); }
     // ---- primitivas de forma: (tipo, hueso, pos, escala, color, largo de pelo, zona, rotación)
     const P=(type,b,pos,scl,col,len,zone='body',rot=null)=>this.prims.push({type,bone:b,pos,scl,rot,color:new THREE.Color(col),len,zone:ZONES.indexOf(zone)});
     const lh=this.longHair;
-    P('sph',this.body,[0,0.0,-0.05],[0.27,0.30,0.62],C.B,0.055); P('sph',this.body,[0,-0.05,0.42],[0.29,0.34,0.36],C.B,0.055); P('sph',this.body,[0,-0.07,-0.52],[0.24,0.26,0.36],C.B,0.055);
-    P('sph',this.body,[0,0.12,-0.1],[0.28,0.25,0.64],C.S,0.065); P('sph',this.body,[0,0.06,-0.5],[0.23,0.2,0.34],C.S,0.065);
-    P('sph',this.body,[0,-0.17,-0.05],[0.23,0.16,0.5],C.L,0.10,'belly'); P('sph',this.body,[0,-0.16,0.4],[0.26,0.22,0.3],C.L,0.10,'belly');
-    if(lh){ P('sph',this.body,[0,-0.18,0.5],[0.22,0.2,0.14],C.F,0.13); P('sph',this.body,[0.17,-0.02,0.47],[0.11,0.16,0.1],C.B,0.13); P('sph',this.body,[-0.17,-0.02,0.47],[0.11,0.16,0.1],C.B,0.13); }
-    P('cyl',this.neck,[0,0.17,0.13],[0.16,0.52,0.17],C.B,0.055,'body',[0.62,0,0]); if(lh) P('cyl',this.neck,[0,0.2,0.08],[0.13,0.4,0.12],C.S,0.065,'body',[0.62,0,0]);
-    P('sph',this.head,[0,0,0],[0.23,0.21,0.25],C.B,0.022,'head'); P('sph',this.head,[0,0.08,-0.03],[0.2,0.15,0.2],C.S,0.02,'head');
-    P('sph',this.head,[0,0.0,0.24],[0.15,0.10,0.26],C.K,0.012,'head'); P('sph',this.head,[0,0.0,0.4],[0.1,0.085,0.1],C.K,0.008,'head');
-    P('sph',this.head,[0.16,-0.05,0.1],[0.1,0.09,0.11],C.L,0.03,'head'); P('sph',this.head,[-0.16,-0.05,0.1],[0.1,0.09,0.11],C.L,0.03,'head');
-    P('sph',this.head,[0.085,0.1,0.18],[0.035,0.025,0.03],C.L,0.012,'head'); P('sph',this.head,[-0.085,0.1,0.18],[0.035,0.025,0.03],C.L,0.012,'head');
-    P('cut',this.head,[0,-0.1,0.33],[0.34,0.05,0.36],0,0,'head');          // ranura de la boca
+    // tronco: cruz alta, lomo que baja hacia la grupa, pecho profundo y vientre recogido
+    P('sph',this.body,[0,0.06,0.1],[0.27,0.30,0.5],C.B,0.055);            // caja torácica
+    P('sph',this.body,[0,-0.1,0.45],[0.25,0.32,0.3],C.B,0.055);            // pecho profundo
+    P('sph',this.body,[0,0.02,-0.32],[0.22,0.25,0.3],C.B,0.055);           // lomo (más angosto: tuck-up)
+    P('sph',this.body,[0,-0.06,-0.55],[0.23,0.24,0.32],C.B,0.055);         // grupa
+    P('sph',this.body,[0,0.19,0.32],[0.24,0.2,0.26],C.S,0.065);            // cruz
+    P('sph',this.body,[0,0.14,-0.12],[0.26,0.2,0.5],C.S,0.065);            // manto
+    P('sph',this.body,[0,0.05,-0.56],[0.2,0.16,0.28],C.S,0.065);           // manto sobre la grupa (más bajo)
+    P('sph',this.body,[0,-0.2,0.15],[0.22,0.14,0.42],C.L,0.10,'belly');    // vientre
+    P('sph',this.body,[0,-0.1,-0.3],[0.17,0.11,0.24],C.L,0.10,'belly');    // vientre recogido
+    P('sph',this.body,[0,-0.1,0.62],[0.15,0.17,0.13],C.F,0.13);            // antepecho
+    if(lh){ P('sph',this.body,[0,-0.18,0.52],[0.22,0.2,0.14],C.F,0.14); P('sph',this.body,[0.18,0.0,0.46],[0.11,0.16,0.1],C.B,0.13); P('sph',this.body,[-0.18,0.0,0.46],[0.11,0.16,0.1],C.B,0.13); }
+    P('cyl',this.neck,[0,0.17,0.13],[0.15,0.56,0.16],C.B,0.06,'body',[0.62,0,0]); if(lh) P('cyl',this.neck,[0,0.21,0.07],[0.12,0.42,0.11],C.S,0.07,'body',[0.62,0,0]);
+    // cabeza en cuña: cráneo, frente con "stop", hocico más largo y angosto, cachetes, cejas
+    P('sph',this.head,[0,0,0],[0.22,0.2,0.24],C.B,0.022,'head'); P('sph',this.head,[0,0.08,-0.02],[0.19,0.14,0.2],C.S,0.02,'head');
+    P('sph',this.head,[0,0.05,0.1],[0.17,0.13,0.14],C.B,0.02,'head');       // frente
+    P('sph',this.head,[0,-0.02,0.27],[0.125,0.095,0.29],C.K,0.012,'head');  // hocico
+    P('sph',this.head,[0,-0.005,0.47],[0.085,0.075,0.085],C.K,0.008,'head');// punta del hocico
+    P('sph',this.head,[0.155,-0.05,0.1],[0.1,0.09,0.11],C.L,0.03,'head'); P('sph',this.head,[-0.155,-0.05,0.1],[0.1,0.09,0.11],C.L,0.03,'head');
+    P('sph',this.head,[0.085,0.1,0.18],[0.04,0.025,0.035],C.L,0.012,'head'); P('sph',this.head,[-0.085,0.1,0.18],[0.04,0.025,0.035],C.L,0.012,'head');
+    P('cut',this.head,[0,-0.1,0.36],[0.24,0.05,0.4],0,0,'head');           // ranura de la boca
     P('cutsph',this.head,[0.1,0.05,0.215],[0.064,0.056,0.066],0,0,'head'); P('cutsph',this.head,[-0.1,0.05,0.215],[0.064,0.056,0.066],0,0,'head'); // cuencas
-    P('sph',this.jaw,[0,-0.045,0.14],[0.12,0.06,0.25],C.K,0.008,'head');
+    P('sph',this.jaw,[0,-0.04,0.13],[0.082,0.048,0.22],C.K,0.008,'head');
     for(const e of this.ears){ P('sph',e,[0,0.2,0],[0.095,0.23,0.04],C.S,0.025,'head'); P('sph',e,[0,0.19,0.02],[0.07,0.18,0.03],C.L,0.012,'head'); }
-    for(const n of ['fl','fr','rl','rr']){ const L=this.legs[n], rear=n[0]==='r';
-      if(rear){ P('cyl',L.up,[0,-0.2,0],[0.105,0.4,0.115],C.B,0.03); P('sph',L.up,[0,0,-0.03],[0.115,0.19,0.145],C.S,0.065); if(lh) P('sph',L.up,[0,-0.2,-0.08],[0.1,0.17,0.1],C.B,0.13); }
-      else { P('cyl',L.up,[0,-0.2,0],[0.08,0.4,0.08],C.B,0.03); P('sph',L.up,[0,0,0],[0.1,0.12,0.1],C.B,0.055); }
-      P('sph',L.knee,[0,0,0],[0.065,0.065,0.065],C.B,0.03); P('cyl',L.knee,[0,-0.18,0],[0.062,0.36,0.062],C.B,0.03); P('sph',L.knee,[0,-0.36,0.03],[0.09,0.065,0.11],C.L,0.008); }
-    this.tail.forEach((s,i)=>{ const r=0.05-0.006*i; P('cyl',s,[0,-0.09,0],[r,0.18,r],i<3?C.S:C.B,0.07,'tail'); if(lh) P('sph',s,[0,-0.09,0.02],[r+0.01,0.1,r+0.02],i<3?C.S:C.F,0.08,'tail'); });
-    // ---- piezas que no forman parte de la piel: ojos, nariz, lengua, interior de la boca
-    const mkMesh=(geo,mat,parent,pos,scl)=>{const m=new THREE.Mesh(geo,mat);m.position.set(...pos);m.scale.set(...scl);m.castShadow=true;m.userData.zone='head';parent.add(m);return m;};
-    const sphG=new THREE.SphereGeometry(1,20,14);
-    const mEyeW=new THREE.MeshPhysicalMaterial({color:0xe9e2d6,roughness:0.15,clearcoat:1,clearcoatRoughness:0.05}),mPupil=new THREE.MeshPhysicalMaterial({color:0x2a1608,roughness:0.08,clearcoat:1,clearcoatRoughness:0.03});
-    const mN=new THREE.MeshPhysicalMaterial({color:colors.nose,roughness:0.28,clearcoat:0.8,clearcoatRoughness:0.25}),mTongue=new THREE.MeshPhysicalMaterial({color:0xe0708a,roughness:0.35,clearcoat:0.7}),mMouth=new THREE.MeshStandardMaterial({color:0x2a0e0c,roughness:1});
-    this.meshes=[this.mesh];
-    this.eyes=[0.1,-0.1].map(x=>{const e=new THREE.Group();e.position.set(x,0.05,0.215);this.head.add(e);const w=mkMesh(sphG,mEyeW,e,[0,0,0],[0.052,0.044,0.044]);const p=mkMesh(sphG,mPupil,e,[0,0,0.016],[0.046,0.039,0.034]);w.castShadow=p.castShadow=false;this.meshes.push(w,p);return e;});
-    this.meshes.push(mkMesh(sphG,mN,this.head,[0,0.03,0.46],[0.062,0.05,0.062]));
-    mkMesh(sphG,mMouth,this.head,[0,-0.09,0.27],[0.11,0.045,0.2]).castShadow=false;
-    this.tongue=mkMesh(new THREE.BoxGeometry(1,1,1),mTongue,this.jaw,[0,0.0,0.2],[0.08,0.02,0.17]);
+    // patas: brazo/muslo, articulación, antebrazo/pierna, y pie con dedos
+    for(const n of ['fl','fr','rl','rr']){ const L=this.legs[n], rear=L.rear;
+      if(rear){ P('cyl',L.up,[0,-0.19,0],[0.1,0.38,0.11],C.B,0.03); P('sph',L.up,[0,-0.02,-0.03],[0.12,0.2,0.15],C.S,0.065); if(lh) P('sph',L.up,[0,-0.2,-0.09],[0.1,0.17,0.1],C.B,0.13);
+        P('sph',L.knee,[0,0,0],[0.065,0.07,0.07],C.B,0.03); P('cyl',L.knee,[0,-0.17,0],[0.058,0.34,0.06],C.B,0.03); P('sph',L.knee,[0,-0.34,-0.01],[0.05,0.06,0.05],C.B,0.02); }
+      else { P('cyl',L.up,[0,-0.18,0],[0.078,0.36,0.082],C.B,0.03); P('sph',L.up,[0,0.02,0],[0.1,0.13,0.1],C.B,0.055); P('sph',L.knee,[0,0,-0.01],[0.06,0.07,0.06],C.B,0.03); P('cyl',L.knee,[0,-0.16,0],[0.055,0.32,0.055],C.B,0.03); }
+      P('sph',L.paw,[0,-0.045,0.03],[0.075,0.055,0.1],C.L,0.008); P('sph',L.paw,[0,-0.07,0.11],[0.07,0.035,0.045],C.L,0.006);
+      for(const tx of [-0.042,0,0.042]) P('sph',L.paw,[tx,-0.075,0.12+(tx?0:0.015)],[0.026,0.024,0.036],C.L,0.004); }
+    this.tail.forEach((s,i)=>{ const r=0.05-0.006*i; P('cyl',s,[0,-0.09,0],[r,0.18,r],i<3?C.S:C.B,0.05,'tail'); if(lh) P('sph',s,[0,-0.09,0.02],[r+0.012,0.1,r+0.025],i<3?C.S:C.F,0.055,'tail'); });
+    // ---- piezas que no forman parte de la piel: ojos con iris y párpados, nariz con fosas, colmillos, lengua
+    const mkMesh=(geo,mat,parent,pos,scl,rot)=>{const m=new THREE.Mesh(geo,mat);m.position.set(...pos);m.scale.set(...scl);if(rot)m.rotation.set(...rot);m.castShadow=true;m.userData.zone='head';parent.add(m);return m;};
+    const sphG=new THREE.SphereGeometry(1,20,14), lidG=new THREE.SphereGeometry(1,20,10,0,Math.PI*2,0,Math.PI*0.55);
+    const mSclera=new THREE.MeshPhysicalMaterial({color:0x9c8a78,roughness:0.2,clearcoat:1,clearcoatRoughness:0.05}),mIris=new THREE.MeshPhysicalMaterial({color:0x5a2e0e,roughness:0.15,clearcoat:1,clearcoatRoughness:0.03}),mPupil=new THREE.MeshPhysicalMaterial({color:0x050302,roughness:0.1,clearcoat:1});
+    const mLid=new THREE.MeshStandardMaterial({color:colors.mask,roughness:0.95}), mN=new THREE.MeshPhysicalMaterial({color:colors.nose,roughness:0.28,clearcoat:0.8,clearcoatRoughness:0.25}),mNostril=new THREE.MeshStandardMaterial({color:0x000000,roughness:1});
+    const mTongue=new THREE.MeshPhysicalMaterial({color:0xd8607a,roughness:0.35,clearcoat:0.7}),mMouth=new THREE.MeshStandardMaterial({color:0x2a0e0c,roughness:1}),mTooth=new THREE.MeshPhysicalMaterial({color:0xf2ecdc,roughness:0.3,clearcoat:0.5});
+    this.meshes=[this.mesh]; this.lids=[];
+    this.eyes=[0.1,-0.1].map(x=>{const e=new THREE.Group();e.position.set(x,0.05,0.215);this.head.add(e);
+      const w=mkMesh(sphG,mSclera,e,[0,0,0],[0.048,0.042,0.042]); const ir=mkMesh(sphG,mIris,e,[0,0,0.012],[0.046,0.04,0.032]); const p=mkMesh(sphG,mPupil,e,[0,0,0.036],[0.024,0.024,0.012]);
+      w.castShadow=ir.castShadow=p.castShadow=false; this.meshes.push(w,ir);
+      const lid=mkMesh(lidG,mLid,e,[0,0,0],[0.056,0.05,0.05]); lid.castShadow=false; lid.rotation.x=-1.5; this.lids.push(lid);   // párpado superior: rota para cerrar
+      return e;});
+    this.meshes.push(mkMesh(sphG,mN,this.head,[0,0.03,0.545],[0.058,0.048,0.052]));
+    [0.02,-0.02].forEach(x=>mkMesh(sphG,mNostril,this.head,[x,0.025,0.595],[0.012,0.014,0.008]).castShadow=false);
+    mkMesh(sphG,mMouth,this.head,[0,-0.09,0.3],[0.1,0.045,0.24]).castShadow=false;
+    const toothG=new THREE.ConeGeometry(1,1,8);
+    [0.055,-0.055].forEach(x=>{ mkMesh(toothG,mTooth,this.head,[x,-0.09,0.43],[0.012,0.035,0.012],[Math.PI,0,0]).castShadow=false; mkMesh(toothG,mTooth,this.jaw,[x*0.85,0.0,0.33],[0.01,0.03,0.01]).castShadow=false; });
+    this.tongue=mkMesh(new THREE.CapsuleGeometry(0.5,1,4,10),mTongue,this.jaw,[0,0.0,0.2],[0.075,0.02,0.09],[Math.PI/2,0,0]);
+    // sombra de contacto suave bajo el cuerpo
+    this.blob=new THREE.Mesh(new THREE.PlaneGeometry(1.7,1.1),new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false})); this.blob.rotation.x=-Math.PI/2; this.blob.position.y=0.006; this.blob.renderOrder=-1; this.root.add(this.blob);
     // ---- construir la piel
     const t0=performance.now(); this.buildSkin(); this.buildFur(); this.genMs=Math.round(performance.now()-t0);
     this.pose=basePose(); this.target=basePose();
     this.speed=0; this.heading=0; this.gait=0; this.look={yaw:0,pitch:0}; this.lookT={yaw:0,pitch:0};
     this.blink=rand(2,5); this.blinkT=0; this.breath=rand(0,6); this.wagT=0; this.twitch=[0,0]; this.twitchT=rand(1,4);
-    this.pant=false; this.tmp=V3();
+    this.pant=false; this.tmp=V3(); this.prevHeading=0; this.earSwing=0;
   }
   // Campo de distancia -> marching cubes -> atributos por vértice -> SkinnedMesh
   buildSkin(){
-    this.root.updateMatrixWorld(true);       // pose de bind: todas las rotaciones en 0
+    this.root.updateMatrixWorld(true);       // pose de bind: rotaciones de reposo (patas anguladas)
     const m4=new THREE.Matrix4(), q=new THREE.Quaternion(), e=new THREE.Euler(), one=V3(1,1,1);
     for(const P of this.prims){ // matriz inversa de cada primitiva (mundo -> local) y caja envolvente en mundo
       e.set(...(P.rot||[0,0,0])); q.setFromEuler(e); m4.compose(V3(...P.pos),q,one); P.world=P.bone.matrixWorld.clone().multiply(m4); P.inv=P.world.clone().invert(); P.ie=P.inv.elements;
@@ -164,13 +190,13 @@ class Dog{
     this.skeleton=new THREE.Skeleton(this.bones); this.mesh.bind(this.skeleton); this.stats={verts:nv,tris:tris.length/3,grid:[nx,ny,nz]};
   }
   buildFur(){ this.shells=[]; const L=this.longHair?FUR_LAYERS:Math.max(3,FUR_LAYERS>>1);
-    for(let i=1;i<=L;i++){ const sh=new THREE.SkinnedMesh(this.mesh.geometry,furMaterial(0xffffff,1,i,L,{vertex:true})); sh.bind(this.skeleton,this.mesh.bindMatrix); sh.castShadow=false; sh.receiveShadow=false; sh.frustumCulled=false; sh.raycast=()=>{}; this.root.add(sh); this.shells.push(sh); } }
+    for(let i=1;i<=L;i++){ const sh=new THREE.SkinnedMesh(this.mesh.geometry,furMaterial(0xffffff,1,i,L,{vertex:true,id:this.id})); sh.bind(this.skeleton,this.mesh.bindMatrix); sh.castShadow=false; sh.receiveShadow=false; sh.frustumCulled=false; sh.raycast=()=>{}; this.root.add(sh); this.shells.push(sh); } }
   setFur(on){ for(const sh of this.shells) sh.visible=on; }
   setDirty(on){ if(this.dirty===on)return; this.dirty=on; const a=this.mesh.geometry.attributes.color; a.array.set(on?this.dirtyColor:this.cleanColor); a.needsUpdate=true; }
   zoneAt(hit){ if(hit.object.userData.zone) return hit.object.userData.zone; if(hit.object===this.mesh&&hit.face) return ZONES[this.zoneAttr[hit.face.a]]; return 'body'; }
   setPose(p,extra){Object.assign(this.target,basePose(),p,extra||{});}
   worldPos(local,obj){return (obj||this.head).localToWorld(this.tmp.copy(local));}
-  mouthPos(){return this.worldPos(V3(0,-0.12,0.42));}
+  mouthPos(){return this.worldPos(V3(0,-0.12,0.45));}
   animate(dt,o){ // o: {wag, mood}
     const p=this.pose,t=this.target,k=1-Math.exp(-9*dt);
     for(const key in p) p[key]=lerp(p[key],t[key],k);
@@ -182,26 +208,35 @@ class Dog{
     const bounce=gal*0.07*Math.abs(Math.sin(ph)), gpitch=gal*0.13*Math.sin(ph);
     this.breath+=dt; const br=Math.sin(this.breath*(this.pant?9:1.6))*0.012;
     this.body.position.y=0.78+p.bodyY+bounce; this.body.rotation.set(p.bodyPitch+gpitch,0,p.bodyRoll); this.body.scale.set(1,1+br,1+br*0.6);
-    for(const n of ['fl','fr','rl','rr']){const L=this.legs[n],u=p[n+'U'],l=p[n+'L'],sw=Math.sin(ph+offs[n])*amp,bend=Math.max(0,Math.sin(ph+offs[n]+1.1))*amp*1.4;
-      L.up.rotation.x=u-sw; L.up.rotation.z=(n==='fl'?1:n==='fr'?-1:0)*p.spread; L.knee.rotation.x=l+bend;}
+    const upright=Math.cos(p.bodyRoll)>0?1:-1;
+    for(const n of ['fl','fr','rl','rr']){const L=this.legs[n],R=REST[n],u=p[n+'U'],l=p[n+'L'],sw=Math.sin(ph+offs[n])*amp,bend=Math.max(0,Math.sin(ph+offs[n]+1.1))*amp*1.4;
+      const upR=R[0]+u-sw, knR=R[1]+l+bend; L.up.rotation.x=upR; L.up.rotation.z=(n==='fl'?1:n==='fr'?-1:0)*p.spread; L.knee.rotation.x=knR;
+      // el pie compensa para quedar plano contra el piso; al balancear la pata en el aire, cuelga un poco
+      const flat=-(upR+knR)-p.bodyPitch*upright; L.paw.rotation.x=damp(L.paw.rotation.x,clamp(flat,-1.7,0.9)+Math.max(0,sw)*0.35,18,dt);}
     this.neck.rotation.x=p.neckPitch;
     this.head.rotation.set(p.headPitch+this.look.pitch,p.headYaw+this.look.yaw,p.headRoll);
-    // parpadeo y orejas
+    // parpadeo con párpados, mirada de los ojos, orejas (con inercia al girar)
     this.blink-=dt; if(this.blink<0){this.blinkT=0.13;this.blink=rand(2,6);} this.blinkT-=dt;
-    const eyeS=this.blinkT>0?0.08:Math.max(0.08,p.eyes); for(const e of this.eyes){e.scale.y=damp(e.scale.y,eyeS,25,dt);}
+    const open=this.blinkT>0?0.05:clamp(p.eyes,0.05,1); const lidRot=lerp(-0.15,-1.5,open);
+    this.lids.forEach(l=>{l.rotation.x=damp(l.rotation.x,lidRot,30,dt);}); this.eyes.forEach(e=>{e.rotation.y=this.look.yaw*0.5;e.rotation.x=this.look.pitch*0.5;});
+    const turn=((this.heading-this.prevHeading+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI; this.prevHeading=this.heading; this.earSwing=damp(this.earSwing,-turn*6,6,dt);
     this.twitchT-=dt; if(this.twitchT<0){this.twitchT=rand(1.5,5);this.twitch[Math.random()<.5?0:1]=0.35;}
     this.ears.forEach((e,i)=>{this.twitch[i]=Math.max(0,this.twitch[i]-dt*1.5);const sd=e.userData.side;
-      e.rotation.x=-0.1-0.25*p.earAlert+1.3*p.earBack+this.twitch[i]; e.rotation.z=sd*(0.42-0.2*p.earAlert+0.6*p.earBack)+this.twitch[i]*sd*0.5;});
+      e.rotation.x=-0.1-0.25*p.earAlert+1.3*p.earBack+this.twitch[i]+bounce*3; e.rotation.z=sd*(0.42-0.2*p.earAlert+0.6*p.earBack)+this.twitch[i]*sd*0.5+clamp(this.earSwing,-0.3,0.3);});
     this.jaw.rotation.x=p.mouth*0.55; this.tongue.visible=p.tongue>0.5||(this.pant&&p.mouth<0.5&&p.eyes>0.2);
     if(this.pant&&this.tongue.visible){this.jaw.rotation.x=0.25+Math.sin(this.breath*9)*0.08;}
     // cola: más rápida mientras más feliz
     const wag=o?o.wag:0.5; this.wagT+=dt*(2+wag*13); const wa=0.15+wag*0.45;
     this.tail.forEach((sg,i)=>{sg.rotation.x=i===0?0.6+p.tailLift*1.2:0.16; sg.rotation.z=Math.sin(this.wagT-i*0.7)*wa*(i===0?1:0.55);});
     this.root.rotation.y=this.heading;
+    // pelo con inercia: las capas se arrastran hacia atrás según la velocidad
+    for(const sh of this.shells){ const u=sh.material.userData.uDrag; if(u) u.value=damp(u.value,this.speed,4,dt); }
+    // sombra de contacto: se achica y aclara cuando salta
+    const lift=clamp(p.bodyY,0,1); this.blob.scale.setScalar(1-lift*0.4); this.blob.material.opacity=1-lift*0.8;
   }
 }
-const dante=new Dog(DANTE_COLORS); scene.add(dante.root); dante.root.position.set(0,0,1.5);
-const kiara=new Dog(KIARA_COLORS,{longHair:false}); kiara.root.scale.setScalar(0.94); kiara.root.visible=false; scene.add(kiara.root);
+const dante=new Dog(DANTE_COLORS,{id:'dante'}); scene.add(dante.root); dante.root.position.set(0,0,1.5);
+const kiara=new Dog(KIARA_COLORS,{longHair:false,id:'kiara'}); kiara.root.scale.setScalar(0.94); kiara.root.visible=false; scene.add(kiara.root);
 console.info(`[dante] malla ${dante.stats.verts} vértices, ${dante.stats.tris} triángulos, grilla ${dante.stats.grid.join('x')}, ${dante.genMs} ms · kiara ${kiara.genMs} ms`);
 
 export { basePose, POSES, DANTE_COLORS, KIARA_COLORS, Dog, dante, kiara };

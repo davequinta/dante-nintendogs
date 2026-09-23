@@ -126,26 +126,30 @@ const KIARA_BED=V3(-5.7,0,4.0), HOUSE_DOOR=V3(-2.4,0,WALL-0.3);
 }
 HOUSE_DOOR.set(-2.4,0,-WALL+0.9);
 const FUR_TEX=(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,256,256);
-  g.lineCap='round'; for(let i=0;i<9000;i++){const v=Math.floor(25+Math.random()*230);g.strokeStyle=`rgb(${v},${v},${v})`;g.lineWidth=rand(0.8,1.8);const x=Math.random()*256,y=Math.random()*256,a=rand(-0.6,0.6),l=rand(4,11);g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.sin(a)*l,y+Math.cos(a)*l);g.stroke();}
+  g.lineCap='round'; for(let i=0;i<7000;i++){const v=Math.floor(20+Math.random()*235);g.strokeStyle=`rgb(${v},${v},${v})`;g.lineWidth=rand(0.7,1.6);const x=Math.random()*256,y=Math.random()*256,a=rand(-0.45,0.45),l=rand(6,16);g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.sin(a)*l,y+Math.cos(a)*l);g.stroke();}
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(7,7);t.anisotropy=4;return t;})();
 const FUR_LAYERS=MOBILE?5:10;
 const furMatCache={};
 // material de una capa de pelo: desplaza la malla a lo largo de la normal, cae con "gravedad", se mece, y oscurece la raíz (oclusión)
-function furMaterial(color,len,layer,layers,opts={}){ const vertex=!!opts.vertex; const key=color+'_'+len+'_'+layer+'_'+(vertex?'v':'s'); if(furMatCache[key])return furMatCache[key];
+function furMaterial(color,len,layer,layers,opts={}){ const vertex=!!opts.vertex; const key=color+'_'+len+'_'+layer+'_'+(vertex?'v':'s')+'_'+(opts.id||''); if(furMatCache[key])return furMatCache[key];
   const u=layer/layers; const c=new THREE.Color(color).lerp(new THREE.Color(0xf3c98a),0.16*u);
   const m=new THREE.MeshStandardMaterial({color:c,roughness:0.92,alphaMap:FUR_TEX,alphaTest:0.5,side:THREE.DoubleSide,vertexColors:vertex});
-  // el desplazamiento va DESPUÉS del skinning: así la capa sigue al hueso y objectNormal ya está deformada
-  m.onBeforeCompile=sh=>{ sh.uniforms.uLayer={value:u}; sh.uniforms.uLen={value:len}; sh.uniforms.uTime=TIME;
-    sh.vertexShader='uniform float uLayer,uLen,uTime;\n'+(vertex?'attribute float furLen; varying float vLen;\n':'')+sh.vertexShader.replace('#include <skinning_vertex>',`#include <skinning_vertex>
+  // el desplazamiento va DESPUÉS del skinning: así la capa sigue al hueso y objectNormal ya está deformada.
+  // Cada capa: sale por la normal, cae por gravedad, fluye hacia atrás (dirección de crecimiento), se arrastra con la velocidad y se mece.
+  m.onBeforeCompile=sh=>{ sh.uniforms.uLayer={value:u}; sh.uniforms.uLen={value:len}; sh.uniforms.uTime=TIME; sh.uniforms.uDrag={value:0}; m.userData.uDrag=sh.uniforms.uDrag;
+    sh.vertexShader='uniform float uLayer,uLen,uTime,uDrag;\n'+(vertex?'attribute float furLen; varying float vLen;\n':'')+sh.vertexShader.replace('#include <skinning_vertex>',`#include <skinning_vertex>
       vec3 nrm=normalize(objectNormal); float d=uLayer*uLen${vertex?'*furLen':''}; ${vertex?'vLen=furLen;':''} vec3 down=normalize((vec4(0.0,-1.0,0.0,0.0)*modelMatrix).xyz);
-      transformed+=nrm*d + down*d*uLayer*0.55 + vec3(sin(uTime*2.1+position.y*7.0),0.0,cos(uTime*1.7+position.x*6.0))*d*uLayer*0.10;`);
+      vec3 flow=normalize(vec3(0.0,-0.35,-1.0)); float q=uLayer*uLayer;
+      transformed+=nrm*d + down*d*q*0.5 + flow*d*q*0.6 + vec3(0.0,0.0,-1.0)*d*q*uDrag*0.18 + vec3(sin(uTime*2.1+position.y*7.0),0.0,cos(uTime*1.7+position.x*6.0))*d*q*0.10;`);
     sh.fragmentShader='uniform float uLayer;\n'+(vertex?'varying float vLen;\n':'')+sh.fragmentShader
       .replace('#include <alphamap_fragment>',`#ifdef USE_ALPHAMAP
         ${vertex?'if(vLen<0.006) discard;':''}
         float hair=texture2D(alphaMap,vAlphaMapUv).g; diffuseColor.a*=step(0.05+pow(uLayer,0.8)*0.92,hair);
       #endif`)
       .replace('#include <color_fragment>',`#include <color_fragment>
-        diffuseColor.rgb*=mix(0.6,1.18,pow(uLayer,0.6));`); };
+        diffuseColor.rgb*=mix(0.5,1.2,pow(uLayer,0.6));`)
+      .replace('#include <opaque_fragment>',`#include <opaque_fragment>
+        float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vViewPosition)),0.0),3.0); gl_FragColor.rgb+=diffuseColor.rgb*rim*0.5*uLayer;`); };
   furMatCache[key]=m; return m; }
 // platos
 const bowls=new THREE.Group(); scene.add(bowls);
