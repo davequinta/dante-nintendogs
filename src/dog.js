@@ -25,7 +25,7 @@ POSES.cry={...POSES.lie,neckPitch:0.3,eyes:0.45,earBack:1,mouth:0.25};
 POSES.paw={...POSES.sit,flU:-1.15,flL:0.95,headRoll:0.15};
 POSES.scratch={...POSES.sit,rrU:-1.1,rrL:0.9,neckPitch:0.5,headYaw:0.6,headRoll:0.4,eyes:0.4};
 
-const DANTE_COLORS={base:0xa24d1c,light:0xc4763a,saddle:0x1b1613,mask:0x14110f,fur:0xc98844,nose:0x121010};
+const DANTE_COLORS={base:0xa24d1c,light:0xc4763a,saddle:0x161210,mask:0x0c0a09,fur:0xc98844,nose:0x121010};
 const KIARA_COLORS={base:0xc9a266,light:0xdcb87c,saddle:0x8a6a3c,mask:0x3a2c22,fur:0xe6d2a2,nose:0x121010};
 
 const ZONES=['body','head','belly','tail'];
@@ -89,6 +89,8 @@ class Dog{
     P('sph',this.head,[0,0.02,0.16],[0.165,0.085,0.12],C.K,0.012,'head');   // máscara alrededor de los ojos
     P('sph',this.head,[0,-0.02,0.29],[0.11,0.09,0.31],C.K,0.012,'head');    // hocico más largo y angosto
     P('sph',this.head,[0,-0.045,0.33],[0.115,0.06,0.24],C.K,0.01,'head');   // belfos (labio superior que cuelga)
+    P('sph',this.head,[0.135,-0.01,0.14],[0.06,0.05,0.07],C.B,0.03,'head'); P('sph',this.head,[-0.135,-0.01,0.14],[0.06,0.05,0.07],C.B,0.03,'head');   // pómulos
+    P('sph',this.head,[0.09,0.115,0.16],[0.06,0.03,0.05],C.S,0.02,'head'); P('sph',this.head,[-0.09,0.115,0.16],[0.06,0.03,0.05],C.S,0.02,'head');   // arcos de las cejas
     P('sph',this.head,[0,-0.005,0.52],[0.08,0.072,0.08],C.K,0.008,'head');  // punta del hocico
     P('sph',this.head,[0.15,-0.07,0.02],[0.1,0.12,0.14],C.B,0.09,'head'); P('sph',this.head,[-0.15,-0.07,0.02],[0.1,0.12,0.14],C.B,0.09,'head');   // cachetes peludos, atrás
     P('sph',this.head,[0.085,0.11,0.19],[0.042,0.026,0.036],C.L,0.012,'head'); P('sph',this.head,[-0.085,0.11,0.19],[0.042,0.026,0.036],C.L,0.012,'head');   // cejas fuego
@@ -241,7 +243,7 @@ class Dog{
       n.set(N[v*3],N[v*3+1],N[v*3+2]); const py=P[v*3+1], pz=P[v*3+2];
       // zonas con mechones largos: orejas (alto en la cabeza), pechera (adelante y bajo), cola
       const ear=Z[v]===1&&py>1.35, chest=Z[v]!==1&&pz>0.35&&py<0.85, tailZ=Z[v]===3, ruff=Z[v]!==1&&pz>0.3&&py>0.85&&py<1.3;   // melena alrededor del cuello
-      const zoneMul=ear?1.9:tailZ?1.7:ruff?1.8:chest?1.35:1, cap=ear?0.13:ruff?0.14:(tailZ||chest)?0.10:0.07;
+      const zoneMul=ear?1.9:tailZ?1.7:ruff?2.1:chest?1.35:1, cap=ear?0.13:ruff?0.16:(tailZ||chest)?0.10:0.07;
       const clump=(ear||tailZ||chest||ruff)?3:2; if(Z[v]===1&&!ear) continue;   // sin fins en la cara
       for(let c=0;c<clump;c++){ p.set(P[v*3]+rand(-0.012,0.012),py+rand(-0.012,0.012),pz+rand(-0.012,0.012));
         t.crossVectors(n,flow); if(t.lengthSq()<1e-4) t.set(1,0,0); t.normalize().applyAxisAngle(n,rand(-0.9,0.9));

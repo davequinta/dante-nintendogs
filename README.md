@@ -60,6 +60,8 @@ Todo el perro sale de código; no hay modelos externos.
 - **Escena**: domo de cielo con shader que también genera el mapa de entorno (`PMREMGenerator`), grama con `InstancedMesh` y vertex shader de viento, texturas y relieves procedurales en canvas, sombras PCF suaves y `OrbitControls` acotados.
 - **Interacción**: `Raycaster` sobre la malla skineada; la zona acariciada (cabeza, panza, cola) sale de un atributo por vértice.
 
+Hay una bitácora con capturas de hasta dónde llegó el enfoque de código puro en [docs/PROGRESO-THREEJS.md](docs/PROGRESO-THREEJS.md).
+
 ## Cómo se juega
 
 - **Acariciar**: arrastrá sobre él. Cabeza, panza y cola reaccionan distinto.
