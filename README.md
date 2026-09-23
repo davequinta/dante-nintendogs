@@ -73,3 +73,5 @@ Hay una bitácora con capturas de hasta dónde llegó el enfoque de código puro
 - **Noche**: por defecto sigue el reloj real de El Salvador. Va al kennel; solo llora si le cerrás la puerta.
 - **Kiara** entra de vez en cuando por la puerta de la casa. Mejor no acercarse a su cama.
 - Tocá el nombre "Dante" para ver logros, racha de días y entrenamiento.
+- **⚙️ Ajustes**: calidad gráfica (Auto, Alta o Ligera), sonido, reloj, pelo, tutorial y reinicio. **📷** guarda una foto de la escena.
+- Si el juego tarda en cargar, la pantalla de carga ofrece pasar a modo ligero; si algo falla, muestra el error para poder reportarlo.

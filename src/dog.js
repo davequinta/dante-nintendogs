@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { edgeTable, triTable } from 'three/addons/objects/MarchingCubes.js';
 import { clamp, lerp, damp, rand, V3 } from './utils.js';
-import { scene, MOBILE, FUR_LAYERS, furMaterial, finMaterial, canvasTex, SKIN_TEX, FUR_TEX } from './scene.js';
+import { scene, MOBILE, LITE, FUR_LAYERS, furMaterial, finMaterial, canvasTex, SKIN_TEX, FUR_TEX } from './scene.js';
 
 // ---------- DOG MODEL
 // El perro es UNA malla orgánica generada en código: el esqueleto (huesos de three) lleva "primitivas" de
@@ -30,7 +30,7 @@ const KIARA_COLORS={base:0xc9a266,light:0xdcb87c,saddle:0x8a6a3c,mask:0x3a2c22,f
 
 const ZONES=['body','head','belly','tail'];
 const SMOOTH_K=0.035;            // radio de fusión entre primitivas
-const CELL=MOBILE?0.03:0.017;    // tamaño de celda del campo de distancia
+const CELL=LITE?0.028:0.017;    // tamaño de celda del campo de distancia
 const BOUNDS={min:[-0.62,-0.08,-1.1],max:[0.62,1.85,1.4]};
 // postura de reposo de las patas (radianes): traseras anguladas como un pastor alemán, con el pie plano compensando
 const REST={fl:[0.05,-0.08],fr:[0.05,-0.08],rl:[-0.32,0.78],rr:[-0.32,0.78]};
@@ -238,7 +238,7 @@ class Dog{
     for(let i=1;i<=L;i++){ const sh=new THREE.SkinnedMesh(this.mesh.geometry,furMaterial(0xffffff,1,i,L,{vertex:true,id:this.id})); sh.bind(this.skeleton,this.mesh.bindMatrix); sh.castShadow=false; sh.receiveShadow=false; sh.frustumCulled=false; sh.raycast=()=>{}; this.root.add(sh); this.shells.push(sh); } }
   // "fins": una tira de hebras por cada tantos vértices, perpendicular a la piel; el shader la muestra solo de canto (silueta)
   buildFins(){ const g=this.mesh.geometry, P=g.attributes.position.array, N=g.attributes.normal.array, Cc=g.attributes.color.array, F=g.attributes.furLen.array, SI=g.attributes.skinIndex.array, SW=g.attributes.skinWeight.array;
-    const nv=P.length/3, step=MOBILE?7:4, flow=V3(0,-0.35,-1).normalize(), t=V3(), n=V3(), p=V3(); const pos=[],nrm=[],col=[],uv=[],si=[],sw=[],fl=[],idx=[]; const Z=this.zoneAttr;
+    const nv=P.length/3, step=LITE?8:4, flow=V3(0,-0.35,-1).normalize(), t=V3(), n=V3(), p=V3(); const pos=[],nrm=[],col=[],uv=[],si=[],sw=[],fl=[],idx=[]; const Z=this.zoneAttr;
     for(let v=0;v<nv;v+=step){ const len=F[v]; if(len<0.035||Math.random()<0.45) continue; if(N[v*3+1]<-0.55&&Math.random()<0.6) continue;   // menos flecos bajo la panza
       n.set(N[v*3],N[v*3+1],N[v*3+2]); const py=P[v*3+1], pz=P[v*3+2];
       // zonas con mechones largos: orejas (alto en la cabeza), pechera (adelante y bajo), cola
@@ -300,8 +300,10 @@ class Dog{
     const lift=clamp(p.bodyY,0,1); this.blob.scale.setScalar(1-lift*0.4); this.blob.material.opacity=1-lift*0.8;
   }
 }
-const dante=new Dog(DANTE_COLORS,{id:'dante'}); scene.add(dante.root); dante.root.position.set(0,0,1.5);
-const kiara=new Dog(KIARA_COLORS,{longHair:false,id:'kiara'}); kiara.root.scale.setScalar(0.94); kiara.root.visible=false; scene.add(kiara.root);
-console.info(`[dante] malla ${dante.stats.verts} vértices, ${dante.stats.tris} triángulos, grilla ${dante.stats.grid.join('x')}, ${dante.genMs} ms · kiara ${kiara.genMs} ms`);
+// los perros se construyen desde la pantalla de carga (main.js) para poder mostrar progreso y capturar errores
+let dante=null, kiara=null;
+function buildDante(){ dante=new Dog(DANTE_COLORS,{id:'dante'}); scene.add(dante.root); dante.root.position.set(0,0,1.5);
+  console.info(`[dante] malla ${dante.stats.verts} vértices, ${dante.stats.tris} triángulos, grilla ${dante.stats.grid.join('x')}, ${dante.genMs} ms`); return dante; }
+function buildKiara(){ kiara=new Dog(KIARA_COLORS,{longHair:false,id:'kiara'}); kiara.root.scale.setScalar(0.94); kiara.root.visible=false; scene.add(kiara.root); return kiara; }
 
-export { basePose, POSES, DANTE_COLORS, KIARA_COLORS, Dog, dante, kiara };
+export { basePose, POSES, DANTE_COLORS, KIARA_COLORS, Dog, dante, kiara, buildDante, buildKiara };

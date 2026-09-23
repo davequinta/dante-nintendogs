@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { clamp, lerp, damp, $, V3, B, KENNEL_POS, KENNEL_DIR } from './utils.js';
 import { Audio } from './audio.js';
 import { Save, stats, DECAY, world, TRICKS, training, achv, addStat } from './state.js';
-import { sky, MOBILE, canvas, renderer, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, skyUniforms, rebuildEnv, kennelDoor, kennelDoorMeshes, kibble, waterMesh, clouds, ball, previewDots, Particles } from './scene.js';
-import { POSES, dante, kiara } from './dog.js';
+import { QUALITY, LITE, sky, MOBILE, canvas, renderer, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, skyUniforms, rebuildEnv, kennelDoor, kennelDoorMeshes, kibble, waterMesh, clouds, ball, previewDots, Particles } from './scene.js';
+import { POSES, dante, kiara, buildDante, buildKiara } from './dog.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
@@ -63,10 +63,26 @@ document.querySelectorAll('.tool').forEach(b=>b.addEventListener('click',()=>{ A
   const a=b.dataset.action; $('#tricks').classList.toggle('show',a==='tricks'&&!$('#tricks').classList.contains('show'));
   if(a==='food')cmdFood(); else if(a==='water')cmdWater(); else if(a==='visit')cmdVisit(); else if(a==='night')cmdNight(); }));
 document.querySelectorAll('#tricks button').forEach(b=>b.addEventListener('click',()=>{ $('#tricks').classList.remove('show'); cmdTrick(b.dataset.trick); }));
-$('#mute').addEventListener('click',()=>{ Audio.ensure(); $('#mute').textContent=Audio.toggle()?'🔇':'🔊'; });
+$('#mute').addEventListener('click',()=>{ Audio.ensure(); const m=Audio.toggle(); $('#mute').textContent=m?'🔇 Apagado':'🔊 Encendido'; $('#mute').classList.toggle('on',!m); });
 $('#kennelBtn').addEventListener('click',()=>{ Audio.ensure(); toggleKennelDoor(); });
-$('#auto').addEventListener('click',()=>{ world.autoClock=!world.autoClock; $('#auto').classList.toggle('on',world.autoClock); toast(world.autoClock?'Reloj de El Salvador activado 🕒':'Reloj automático apagado'); clockT=0; });
-$('#furbtn').addEventListener('click',()=>{ world.fur=!world.fur; $('#furbtn').classList.toggle('on',world.fur); dante.setFur(world.fur); kiara.setFur(world.fur); ball.mesh.children.forEach(c=>c.visible=world.fur); toast(world.fur?'Pelo detallado activado 🧶':'Pelo simple (más rápido)'); });
+$('#auto').addEventListener('click',()=>{ world.autoClock=!world.autoClock; $('#auto').classList.toggle('on',world.autoClock); $('#auto').textContent=world.autoClock?'🕒 Automático':'🕒 Manual'; toast(world.autoClock?'Reloj de El Salvador activado 🕒':'Reloj automático apagado'); clockT=0; });
+$('#furbtn').addEventListener('click',()=>{ world.fur=!world.fur; $('#furbtn').classList.toggle('on',world.fur); $('#furbtn').textContent=world.fur?'🧶 Encendido':'🧶 Apagado'; dante.setFur(world.fur); kiara.setFur(world.fur); ball.mesh.children.forEach(c=>c.visible=world.fur); toast(world.fur?'Pelo detallado activado 🧶':'Pelo simple (más rápido)'); });
+// ---------- menú de ajustes, tutorial, calidad, foto
+const openModal=id=>{ $(id).classList.add('show'); }, closeModal=id=>{ $(id).classList.remove('show'); };
+$('#menuBtn').addEventListener('click',()=>{ Audio.ensure(); openModal('#menu'); });
+$('#menuClose').addEventListener('click',()=>closeModal('#menu'));
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m&&m.id!=='welcome') m.classList.remove('show'); }));
+$('#helpBtn').addEventListener('click',()=>{ closeModal('#menu'); openModal('#welcome'); });
+$('#welcomeGo').addEventListener('click',()=>{ Audio.ensure(); closeModal('#welcome'); try{ localStorage.setItem('dante-welcomed','1'); }catch(e){} });
+document.querySelectorAll('#qualitySeg button').forEach(b=>{ b.classList.toggle('on',b.dataset.q===QUALITY);
+  b.addEventListener('click',()=>{ if(b.dataset.q===QUALITY)return; try{ localStorage.setItem('dante-quality',b.dataset.q); }catch(e){} persist(); toast('Cambiando calidad…',1.5); setTimeout(()=>location.reload(),300); }); });
+$('#photoBtn').addEventListener('click',()=>{ Audio.ensure(); if(composer) composer.render(); else renderer.render(scene,camera); const url=canvas.toDataURL('image/jpeg',0.92);
+  const fl=document.createElement('div'); fl.className='flash go'; document.body.appendChild(fl); setTimeout(()=>fl.remove(),500); Audio.snap();
+  const a=document.createElement('a'); a.href=url; a.download=`dante-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.jpg`; document.body.appendChild(a); a.click(); a.remove(); toast('📷 Foto guardada'); achv.photos=(achv.photos||0)+1; });
+// números flotantes cuando un stat cambia de golpe
+const STAT_ICON={hambre:'🍖',sed:'💧',energia:'⚡',felicidad:'💗',limpieza:'✨'}; let floatT=0;
+addEventListener('dante:stat',e=>{ const {k,d}=e.detail; if(world.time-floatT<0.25) return; floatT=world.time; const bar=$('#f-'+k); if(!bar)return; const r=bar.getBoundingClientRect();
+  const f=document.createElement('div'); f.className='floater'+(d<0?' neg':''); f.textContent=`${d>0?'+':''}${Math.round(d)} ${STAT_ICON[k]}`; f.style.left=(r.right+6)+'px'; f.style.top=(r.top-6)+'px'; $('#floaters').appendChild(f); setTimeout(()=>f.remove(),1400); });
 $('#title').addEventListener('click',()=>{ renderAchv(); $('#achv').classList.add('show'); });
 $('#achvClose').addEventListener('click',()=>$('#achv').classList.remove('show'));
 $('#achv').addEventListener('click',e=>{ if(e.target.id==='achv') $('#achv').classList.remove('show'); });
@@ -102,7 +118,8 @@ function registerDay(){ const k=svDateKey(); if(achv.days.includes(k))return; co
 $('#reset').addEventListener('click',()=>{ if(confirm('¿Reiniciar el estado de Dante?')){ Save.clear(); location.reload(); } });
 selectTool('hand');
 const fills={}; for(const k in stats) fills[k]=$('#f-'+k);
-function updateHUD(){ for(const k in stats){ const v=stats[k]; fills[k].style.width=v+'%'; fills[k].classList.toggle('low',v<25); } }
+function updateHUD(){ for(const k in stats){ const v=stats[k]; fills[k].style.width=v+'%'; fills[k].classList.toggle('low',v<25); }
+  $('[data-action=food]').classList.toggle('alert',stats.hambre<25&&world.food<=0.02); $('[data-action=water]').classList.toggle('alert',stats.sed<25&&world.water<=0.02); $('[data-tool=brush]').classList.toggle('alert',stats.limpieza<25); }
 const headWorld=V3();
 function updateBubble(dt){ bubble.t-=dt; if(bubble.t<=0){ bubble.el.classList.remove('show'); return; }
   dante.head.getWorldPosition(headWorld); headWorld.y+=0.38; headWorld.project(camera);
@@ -139,15 +156,15 @@ function applySave(s){ if(!s)return; Object.assign(stats,s.stats||{}); world.foo
     const h=Math.floor(mins/60),m=Math.round(mins%60); toast(`Pasaron ${h?h+' h ':''}${m} min. Dante te extrañó 🐕`,4); }
   if(s.night&&!(world.autoClock&&!(world.svHour<5.75||world.svHour>=18.25))){ world.night=true; world.nightT=1; $('[data-action=night]').classList.add('on'); dante.root.position.copy(KENNEL_POS).addScaledVector(KENNEL_DIR,0.05); dante.heading=Math.PI/4; setState('sleep'); }
 }
-applySave(Save.load()); kibble.visible=world.food>0; waterMesh.visible=world.water>0; registerDay(); updateTrickUI(); updateKennelBtn(); checkMedals();
-if(world.autoClock&&!world.night){ const {h,m}=svParts(); world.svHour=h+m/60; if(world.svHour<5.75||world.svHour>=18.25){ world.night=true; world.nightT=1; $('[data-action=night]').classList.add('on'); dante.root.position.copy(KENNEL_POS).addScaledVector(KENNEL_DIR,0.05); dante.heading=Math.PI/4; setState('sleep'); } }
+function loadSaved(){ applySave(Save.load()); kibble.visible=world.food>0; waterMesh.visible=world.water>0; registerDay(); updateTrickUI(); updateKennelBtn(); checkMedals();
+  if(world.autoClock&&!world.night){ const {h,m}=svParts(); world.svHour=h+m/60; if(world.svHour<5.75||world.svHour>=18.25){ world.night=true; world.nightT=1; $('[data-action=night]').classList.add('on'); dante.root.position.copy(KENNEL_POS).addScaledVector(KENNEL_DIR,0.05); dante.heading=Math.PI/4; setState('sleep'); } } }
 let saveT=5; function persist(){ Save.write(snapshot()); }
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) persist(); }); addEventListener('pagehide',persist);
 
 // ---------- LOOP
 // oclusión ambiental en pantalla (GTAO) solo en escritorio: asienta al perro y a los objetos en el patio
 let composer=null, aoPass=null;
-if(!MOBILE){ composer=new EffectComposer(renderer); composer.setPixelRatio(renderer.getPixelRatio()); composer.addPass(new RenderPass(scene,camera));
+if(!LITE){ composer=new EffectComposer(renderer); composer.setPixelRatio(renderer.getPixelRatio()); composer.addPass(new RenderPass(scene,camera));
   aoPass=new GTAOPass(scene,camera,innerWidth,innerHeight); aoPass.output=GTAOPass.OUTPUT.Default; aoPass.blendIntensity=0.85;
   aoPass.updateGtaoMaterial({radius:0.3,distanceExponent:1,thickness:1,scale:1,samples:12,distanceFallOff:1,screenSpaceRadius:false}); composer.addPass(aoPass); composer.addPass(new OutputPass());
   // los sprites (corazones, pelos, zzz) y la sombra de contacto no deben ocluir: se ocultan solo durante el pase de AO
@@ -171,7 +188,29 @@ function frame(){ requestAnimationFrame(frame); const dt=Math.min(clock.getDelta
   saveT-=dt; if(saveT<0){ saveT=6; persist(); }
   if(composer) composer.render(); else renderer.render(scene,camera);
 }
-updateHUD(); frame(); $('#loading').classList.add('hide');
-window.__dante={dante,kiara,ai,setState,POSES,stats,world,camera,controls,cmdNight,setNight,cmdVisit,cmdFood,cmdWater,cmdTrick,ball,kiaraAI,kSet,doThrow,visit,training,achv,toggleKennelDoor,checkMedals};
+// ---------- ARRANQUE por etapas con pantalla de carga, errores visibles y modo ligero
+const Loader={ el:$('#loading'), t0:performance.now(), slowTimer:null,
+  step(txt,pct){ $('#ld-step').textContent=txt; $('#ld-fill').style.width=pct+'%'; },
+  tip(){ const tips=['Tip: arrastrá sobre Dante para acariciarlo','Tip: tocá el nombre "Dante" para ver sus logros','Tip: si lo encerrás en el kennel de noche, llora','Tip: el mango después de un truco le enseña más rápido','Tip: Kiara gruñe si te le acercás a su cama','Tip: en ⚙️ podés bajar la calidad si va lento']; $('#ld-tip').textContent=tips[Math.floor(Math.random()*tips.length)]; },
+  fail(err){ const msg=(err&&(err.stack||err.message))||String(err); $('#ld-errmsg').textContent=msg.slice(0,900); $('#ld-err').classList.add('show'); $('#ld-slow').classList.remove('show'); $('#ld-step').textContent='Algo falló al cargar'; console.error(err); },
+  done(){ clearTimeout(this.slowTimer); this.el.classList.add('hide'); setTimeout(()=>{ this.el.style.display='none'; },600); } };
+const goLite=()=>{ try{ localStorage.setItem('dante-quality','lite'); }catch(e){} location.reload(); };
+$('#ld-lite').addEventListener('click',goLite); $('#ld-lite2').addEventListener('click',goLite); $('#ld-retry').addEventListener('click',()=>location.reload());
+Loader.slowTimer=setTimeout(()=>{ if(!Loader.el.classList.contains('hide')) $('#ld-slow').classList.add('show'); },9000);
+addEventListener('error',e=>{ if(!Loader.el.classList.contains('hide')) Loader.fail(e.error||e.message); });
+addEventListener('unhandledrejection',e=>{ if(!Loader.el.classList.contains('hide')) Loader.fail(e.reason); });
+const yieldFrame=()=>new Promise(r=>setTimeout(r,20));
+async function boot(){
+  Loader.tip(); Loader.step('Preparando el patio…',15); await yieldFrame();
+  Loader.step(LITE?'Construyendo a Dante (modo ligero)…':'Construyendo a Dante…',35); await yieldFrame(); buildDante();
+  Loader.step('Peinándole el pelo…',60); await yieldFrame();
+  Loader.step('Llamando a Kiara…',75); await yieldFrame(); buildKiara();
+  Loader.step('Cargando tu progreso…',88); await yieldFrame(); loadSaved();
+  Loader.step('¡Listo!',100); updateHUD(); frame(); await yieldFrame(); Loader.done();
+  let welcomed=false; try{ welcomed=!!localStorage.getItem('dante-welcomed'); }catch(e){} if(!welcomed) setTimeout(()=>openModal('#welcome'),500);
+  window.__dante=Object.assign(window.__dante||{},{dante,kiara});
+}
+boot().catch(err=>Loader.fail(err));
+window.__dante={ai,setState,POSES,stats,world,camera,controls,cmdNight,setNight,cmdVisit,cmdFood,cmdWater,cmdTrick,ball,kiaraAI,kSet,doThrow,visit,training,achv,toggleKennelDoor,checkMedals};
 
 export { ray, ndc, groundPlane, lookPlane, tool, drag, setNDC, hitDog, throwVector, showPreview, hidePreview, doThrow, petTick, endDrag, HINTS, selectTool, updateTrickUI, MEDALS, checkMedals, renderAchv, svParts, svDateKey, clockT, updateClock, registerDay, fills, updateHUD, headWorld, updateBubble, fogDay, tmpC, updateDayNight, lastEnvN, snapshot, applySave, saveT, persist, resize, clock, hudT, medalT, camDelta, camGoal, frame };

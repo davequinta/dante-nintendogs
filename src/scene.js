@@ -9,6 +9,10 @@ const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'h
 renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const MOBILE=matchMedia('(pointer:coarse)').matches;
+// calidad: 'auto' decide por el dispositivo; 'lite' o 'high' lo fuerza el usuario desde el menú (se guarda aparte del juego)
+const QUALITY=(()=>{ try{ return localStorage.getItem('dante-quality')||'auto'; }catch(e){ return 'auto'; } })();
+const WEAK=MOBILE||(navigator.deviceMemory&&navigator.deviceMemory<=4)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4)||!renderer.capabilities.isWebGL2;
+const LITE=QUALITY==='lite'||(QUALITY==='auto'&&WEAK);
 const TIME={value:0};   // uniform compartido para pelo y grama
 renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
 const scene=new THREE.Scene();
@@ -22,7 +26,7 @@ controls.minDistance=3.2; controls.maxDistance=12; controls.minPolarAngle=0.3; c
 
 const hemi=new THREE.HemisphereLight(0xcfe9ff,0x6f8f3c,0.95); scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff1d6,2.6); sun.position.set(7,11,5); sun.castShadow=true;
-sun.shadow.mapSize.set(MOBILE?1024:2048,MOBILE?1024:2048); Object.assign(sun.shadow.camera,{left:-10,right:10,top:10,bottom:-10,near:1,far:35});
+sun.shadow.mapSize.set(LITE?1024:2048,LITE?1024:2048); Object.assign(sun.shadow.camera,{left:-10,right:10,top:10,bottom:-10,near:1,far:35});
 sun.shadow.bias=-0.0008; sun.shadow.normalBias=0.03; scene.add(sun); scene.add(sun.target);
 const porch=new THREE.PointLight(0xffb45a,0,12,1.6); porch.position.set(-3.5,2.4,-5.5); scene.add(porch);
 
@@ -92,7 +96,7 @@ const grassCardTex=(()=>{const c=document.createElement('canvas');c.width=256;c.
   for(let i=0;i<70;i++){ const x=rand(20,236), top=rand(20,120), bend=rand(-40,40), w=rand(3,7); const hue=rand(85,110), l=rand(28,46);
     const gr=g.createLinearGradient(0,256,0,top); gr.addColorStop(0,`hsl(${hue},45%,${l-14}%)`); gr.addColorStop(1,`hsl(${hue},55%,${l+8}%)`); g.strokeStyle=gr; g.lineWidth=w; g.beginPath(); g.moveTo(x,256); g.quadraticCurveTo(x+bend*0.4,180,x+bend,top); g.stroke(); }
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;})();
-const grassBlades=(()=>{ const N=MOBILE?3000:9000; const q=new THREE.PlaneGeometry(0.42,0.34); q.translate(0,0.17,0); const q2=q.clone().rotateY(Math.PI/2);
+const grassBlades=(()=>{ const N=LITE?2500:9000; const q=new THREE.PlaneGeometry(0.42,0.34); q.translate(0,0.17,0); const q2=q.clone().rotateY(Math.PI/2);
   const geo=new THREE.BufferGeometry(); const pos=[...q.attributes.position.array,...q2.attributes.position.array], nrm=[...q.attributes.normal.array,...q2.attributes.normal.array], uv=[...q.attributes.uv.array,...q2.attributes.uv.array]; const idx=[...q.index.array,...[...q2.index.array].map(i=>i+4)];
   geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); geo.setAttribute('normal',new THREE.Float32BufferAttribute(nrm,3)); geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); geo.setIndex(idx);
   const mat=new THREE.MeshStandardMaterial({map:grassCardTex,alphaTest:0.45,side:THREE.DoubleSide,roughness:0.9});
@@ -158,7 +162,7 @@ HOUSE_DOOR.set(-2.4,0,-WALL+0.9);
 const FUR_TEX=(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,256,256);
   g.lineCap='round'; for(let i=0;i<7000;i++){const v=Math.floor(20+Math.random()*235);g.strokeStyle=`rgb(${v},${v},${v})`;g.lineWidth=rand(0.7,1.6);const x=Math.random()*256,y=Math.random()*256,a=rand(-0.45,0.45),l=rand(6,16);g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.sin(a)*l,y+Math.cos(a)*l);g.stroke();}
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(7,7);t.anisotropy=4;return t;})();
-const FUR_LAYERS=MOBILE?5:10;
+const FUR_LAYERS=LITE?4:10;
 // detalle de pelo real: recorte de la pechera de Dante convertido a mapa de multiplicación (media 1), en espejo para que no se note el borde
 const FUR_DETAIL=(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,256,256);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.MirroredRepeatWrapping;t.colorSpace=THREE.NoColorSpace;
   new THREE.ImageLoader().load('./tex/fur_gold.jpg',img=>{ g.drawImage(img,0,0,256,256); const d=g.getImageData(0,0,256,256); const px=d.data; const W=256, L=new Float32Array(W*W), Bl=new Float32Array(W*W);
@@ -188,7 +192,7 @@ const furMatCache={};
 // material de una capa de pelo: desplaza la malla a lo largo de la normal, cae con "gravedad", se mece, y oscurece la raíz (oclusión)
 function furMaterial(color,len,layer,layers,opts={}){ const vertex=!!opts.vertex; const key=color+'_'+len+'_'+layer+'_'+(vertex?'v':'s')+'_'+(opts.id||''); if(furMatCache[key])return furMatCache[key];
   const u=layer/layers; const c=new THREE.Color(color).lerp(new THREE.Color(0xf3c98a),0.07*u);
-  const m=(vertex&&!MOBILE)?new THREE.MeshPhysicalMaterial({color:c,roughness:0.85,alphaMap:FUR_TEX,alphaTest:0.5,side:THREE.DoubleSide,vertexColors:true,sheen:0.18,sheenRoughness:0.7,sheenColor:new THREE.Color(0xd9a060),anisotropy:0.3,anisotropyRotation:1.2})
+  const m=(vertex&&!LITE)?new THREE.MeshPhysicalMaterial({color:c,roughness:0.85,alphaMap:FUR_TEX,alphaTest:0.5,side:THREE.DoubleSide,vertexColors:true,sheen:0.18,sheenRoughness:0.7,sheenColor:new THREE.Color(0xd9a060),anisotropy:0.3,anisotropyRotation:1.2})
     :new THREE.MeshStandardMaterial({color:c,roughness:0.92,alphaMap:FUR_TEX,alphaTest:0.5,side:THREE.DoubleSide,vertexColors:vertex});
   // el desplazamiento va DESPUÉS del skinning: así la capa sigue al hueso y objectNormal ya está deformada.
   // Cada capa: sale por la normal, cae por gravedad, fluye hacia atrás (dirección de crecimiento), se arrastra con la velocidad y se mece.
@@ -226,7 +230,7 @@ const leafCardTex=(()=>{const c=document.createElement('canvas');c.width=256;c.h
     g.strokeStyle=`hsl(${hue},40%,${l-12}%)`; g.lineWidth=1.5; g.beginPath(); g.moveTo(-L/2,0); g.lineTo(L/2,0); g.stroke(); g.restore(); }
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;})();
 const leafCardMat=new THREE.MeshStandardMaterial({map:leafCardTex,alphaTest:0.5,side:THREE.DoubleSide,roughness:0.85});
-function foliage(parent,cx,cy,cz,r,n){ const count=Math.round(n*(MOBILE?22:40)); const geo=new THREE.PlaneGeometry(r*0.9,r*0.9); const im=new THREE.InstancedMesh(geo,leafCardMat,count); im.castShadow=true; im.receiveShadow=true;
+function foliage(parent,cx,cy,cz,r,n){ const count=Math.round(n*(LITE?18:40)); const geo=new THREE.PlaneGeometry(r*0.9,r*0.9); const im=new THREE.InstancedMesh(geo,leafCardMat,count); im.castShadow=true; im.receiveShadow=true;
   const o=new THREE.Object3D(); const col=new THREE.Color();
   for(let i=0;i<count;i++){ const a=rand(0,Math.PI*2),b=rand(-1,1),d=Math.cbrt(Math.random())*r*1.05; const sy=b*0.85; o.position.set(cx+Math.cos(a)*Math.sqrt(1-sy*sy)*d,cy+sy*d,cz+Math.sin(a)*Math.sqrt(1-sy*sy)*d); o.rotation.set(rand(0,Math.PI),rand(0,Math.PI),rand(0,Math.PI)); const sc=rand(0.7,1.3); o.scale.set(sc,sc,sc); o.updateMatrix(); im.setMatrixAt(i,o.matrix); col.setHSL(rand(0.24,0.32),rand(0.45,0.6),rand(0.35,0.55)); im.setColorAt(i,col); }
   im.instanceMatrix.needsUpdate=true; if(im.instanceColor)im.instanceColor.needsUpdate=true; parent.add(im); }
@@ -279,4 +283,4 @@ const Particles=(()=>{
   return {spawn,update};
 })();
 
-export { sky, FIN_TEX, SKIN_TEX, finMaterial, canvas, renderer, MOBILE, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, M, G, noiseCanvas, bumpTex, skyUniforms, skyMat, skyDome, pmrem, rebuildEnv, mesh, canvasTex, grassTex, grassBump, tileDraw, tileTex, tileBump, tileMat, ground, terrace, walkway, grassBlades, stuccoBump, brickTex, wallMat, wallMat2, brickMat, walls, gate, barMat, kennel, kennelDoor, kennelDoorMeshes, KIARA_BED, HOUSE_DOOR, FUR_TEX, FUR_LAYERS, furMatCache, furMaterial, bowls, kibbleMat, waterMat, bowl, foodBowl, waterBowl, kibble, waterMesh, leafBump, potMat, leafMat, leafMat2, foliage, pot, sunBall, clouds, stars, visitor, flies, relocateFly, ballTex, ball, previewDots, Particles };
+export { QUALITY, LITE, sky, FIN_TEX, SKIN_TEX, finMaterial, canvas, renderer, MOBILE, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, M, G, noiseCanvas, bumpTex, skyUniforms, skyMat, skyDome, pmrem, rebuildEnv, mesh, canvasTex, grassTex, grassBump, tileDraw, tileTex, tileBump, tileMat, ground, terrace, walkway, grassBlades, stuccoBump, brickTex, wallMat, wallMat2, brickMat, walls, gate, barMat, kennel, kennelDoor, kennelDoorMeshes, KIARA_BED, HOUSE_DOOR, FUR_TEX, FUR_LAYERS, furMatCache, furMaterial, bowls, kibbleMat, waterMat, bowl, foodBowl, waterBowl, kibble, waterMesh, leafBump, potMat, leafMat, leafMat2, foliage, pot, sunBall, clouds, stars, visitor, flies, relocateFly, ballTex, ball, previewDots, Particles };

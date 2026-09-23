@@ -20,7 +20,40 @@
 <body>
 <canvas id="c"></canvas>
 <div id="vignette" style="position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(30,15,5,.38) 100%);z-index:1"></div>
-<div id="loading">Cargando a Dante… 🐕</div>
+<div id="loading">
+  <div class="ld-card">
+    <div class="ld-paw">🐾</div>
+    <div class="ld-title">Dante <span class="medal small">★</span></div>
+    <div class="ld-step" id="ld-step">Preparando el patio…</div>
+    <div class="ld-bar"><i id="ld-fill"></i></div>
+    <div class="ld-tip" id="ld-tip">Tip: arrastrá sobre Dante para acariciarlo</div>
+    <div class="ld-slow" id="ld-slow">Está tardando más de lo normal. <button id="ld-lite">Probar modo ligero</button></div>
+    <div class="ld-err" id="ld-err"><b>No pude cargar el juego.</b><pre id="ld-errmsg"></pre><div class="ld-actions"><button id="ld-retry">Reintentar</button><button id="ld-lite2">Modo ligero</button></div></div>
+  </div>
+</div>
+<div id="welcome" class="modal"><div class="panel">
+  <h2>¡Hola! Soy Dante 🐕</h2>
+  <p class="sub">Pastor alemán, dos veces campeón de El Salvador. Así se juega:</p>
+  <div class="how">
+    <div><span class="ic">🖐️</span><b>Acariciar</b><small>Arrastrá sobre mí. Cabeza, panza y cola reaccionan distinto.</small></div>
+    <div><span class="ic">🎾</span><b>Pelota</b><small>Arrastrá hacia arriba para apuntar y soltá para lanzar. La traigo.</small></div>
+    <div><span class="ic">🎓</span><b>Trucos</b><small>Sit, platz, pata, rodar, saltar, habla y pose de show. Con práctica los aprendo.</small></div>
+    <div><span class="ic">🌙</span><b>Noche</b><small>Sigo el reloj real de El Salvador. En el kennel duermo, pero si me encerrás lloro.</small></div>
+  </div>
+  <button class="primary" id="welcomeGo">¡A jugar!</button>
+</div></div>
+<div id="menu" class="modal"><div class="panel">
+  <h2>⚙️ Ajustes</h2>
+  <div class="row"><span>Calidad gráfica</span><div class="seg" id="qualitySeg"><button data-q="auto">Auto</button><button data-q="high">Alta</button><button data-q="lite">Ligera</button></div></div>
+  <div class="row"><span>Sonido</span><button class="tog" id="mute">🔊 Encendido</button></div>
+  <div class="row"><span>Reloj de El Salvador</span><button class="tog on" id="auto">🕒 Automático</button></div>
+  <div class="row"><span>Pelo detallado</span><button class="tog on" id="furbtn">🧶 Encendido</button></div>
+  <div class="row"><span>Tutorial</span><button class="tog" id="helpBtn">📖 Ver de nuevo</button></div>
+  <div class="row danger"><span>Reiniciar a Dante</span><button class="tog" id="reset">⟲ Borrar progreso</button></div>
+  <div class="credits">Hecho con Three.js, sin modelos externos. <a href="https://github.com/davequinta/dante-nintendogs" target="_blank" rel="noopener">Código en GitHub</a></div>
+  <button class="close" id="menuClose">Cerrar</button>
+</div></div>
+<div id="floaters"></div>
 <div id="hud">
   <div class="card" id="left">
     <div id="title" title="Logros"><span class="medal">★</span> Dante <span id="lvl" style="font-size:11px;opacity:.7;margin-left:4px"></span></div>
@@ -34,10 +67,8 @@
     </div>
   </div>
   <div id="right">
-    <button class="iconbtn" id="mute" title="Sonido">🔊</button>
-    <button class="iconbtn on" id="auto" title="Reloj automático de El Salvador">🕒</button>
-    <button class="iconbtn on" id="furbtn" title="Pelo detallado">🧶</button>
-    <button class="iconbtn" id="reset" title="Reiniciar">⟲</button>
+    <button class="iconbtn" id="menuBtn" title="Ajustes">⚙️</button>
+    <button class="iconbtn" id="photoBtn" title="Foto">📷</button>
   </div>
 </div>
 <div id="bubble"></div>
