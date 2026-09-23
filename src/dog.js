@@ -117,7 +117,7 @@ class Dog{
     [0.055,-0.055].forEach(x=>{ mkMesh(toothG,mTooth,this.head,[x,-0.09,0.43],[0.012,0.035,0.012],[Math.PI,0,0]).castShadow=false; mkMesh(toothG,mTooth,this.jaw,[x*0.85,0.0,0.33],[0.01,0.03,0.01]).castShadow=false; });
     this.tongue=mkMesh(new THREE.CapsuleGeometry(0.5,1,4,10),mTongue,this.jaw,[0,0.0,0.2],[0.075,0.02,0.09],[Math.PI/2,0,0]);
     // sombra de contacto suave bajo el cuerpo
-    this.blob=new THREE.Mesh(new THREE.PlaneGeometry(1.7,1.1),new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false})); this.blob.rotation.x=-Math.PI/2; this.blob.position.y=0.006; this.blob.renderOrder=-1; this.root.add(this.blob);
+    this.blob=new THREE.Mesh(new THREE.PlaneGeometry(1.7,1.1),new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false})); this.blob.rotation.x=-Math.PI/2; this.blob.position.y=0.006; this.blob.renderOrder=-1; this.blob.userData.noAO=true; this.root.add(this.blob);
     // ---- construir la piel
     const t0=performance.now(); this.buildSkin(); this.buildFur(); this.buildFins(); this.genMs=Math.round(performance.now()-t0);
     this.pose=basePose(); this.target=basePose();
@@ -219,15 +219,19 @@ class Dog{
     for(let i=1;i<=L;i++){ const sh=new THREE.SkinnedMesh(this.mesh.geometry,furMaterial(0xffffff,1,i,L,{vertex:true,id:this.id})); sh.bind(this.skeleton,this.mesh.bindMatrix); sh.castShadow=false; sh.receiveShadow=false; sh.frustumCulled=false; sh.raycast=()=>{}; this.root.add(sh); this.shells.push(sh); } }
   // "fins": una tira de hebras por cada tantos vértices, perpendicular a la piel; el shader la muestra solo de canto (silueta)
   buildFins(){ const g=this.mesh.geometry, P=g.attributes.position.array, N=g.attributes.normal.array, Cc=g.attributes.color.array, F=g.attributes.furLen.array, SI=g.attributes.skinIndex.array, SW=g.attributes.skinWeight.array;
-    const nv=P.length/3, step=MOBILE?6:3, flow=V3(0,-0.35,-1).normalize(), t=V3(), n=V3(), p=V3(); const pos=[],nrm=[],col=[],uv=[],si=[],sw=[],fl=[],idx=[];
+    const nv=P.length/3, step=MOBILE?7:4, flow=V3(0,-0.35,-1).normalize(), t=V3(), n=V3(), p=V3(); const pos=[],nrm=[],col=[],uv=[],si=[],sw=[],fl=[],idx=[]; const Z=this.zoneAttr;
     for(let v=0;v<nv;v+=step){ const len=F[v]; if(len<0.03||Math.random()<0.45) continue; if(N[v*3+1]<-0.55&&Math.random()<0.6) continue;   // menos flecos bajo la panza
-      n.set(N[v*3],N[v*3+1],N[v*3+2]); p.set(P[v*3],P[v*3+1],P[v*3+2]);
-      t.crossVectors(n,flow); if(t.lengthSq()<1e-4) t.set(1,0,0); t.normalize().applyAxisAngle(n,rand(-0.7,0.7));
-      const w=rand(0.012,0.026)*clamp(len/0.06+0.4,0.5,1.2), L=Math.min(0.07,len*rand(0.7,1.1)), tx=n.x*L+flow.x*L*0.4, ty=n.y*L+flow.y*L*0.4, tz=n.z*L+flow.z*L*0.4, u0=Math.random();
-      const base=pos.length/3;
-      pos.push(p.x-t.x*w,p.y-t.y*w,p.z-t.z*w, p.x+t.x*w,p.y+t.y*w,p.z+t.z*w, p.x-t.x*w+tx,p.y-t.y*w+ty,p.z-t.z*w+tz, p.x+t.x*w+tx,p.y+t.y*w+ty,p.z+t.z*w+tz);
-      for(let k=0;k<4;k++){ nrm.push(n.x,n.y,n.z); col.push(Cc[v*3],Cc[v*3+1],Cc[v*3+2]); for(let j=0;j<4;j++){ si.push(SI[v*4+j]); sw.push(SW[v*4+j]); } fl.push(L); }
-      uv.push(u0,0, u0+0.18,0, u0,1, u0+0.18,1); idx.push(base,base+1,base+2, base+1,base+3,base+2); }
+      n.set(N[v*3],N[v*3+1],N[v*3+2]); const py=P[v*3+1], pz=P[v*3+2];
+      // zonas con mechones largos: orejas (alto en la cabeza), pechera (adelante y bajo), cola
+      const ear=Z[v]===1&&py>1.35, chest=Z[v]!==1&&pz>0.35&&py<0.85, tailZ=Z[v]===3; const zoneMul=ear?1.9:tailZ?1.7:chest?1.35:1, cap=ear?0.13:(tailZ||chest)?0.10:0.07;
+      const clump=(ear||tailZ||chest)?3:2;
+      for(let c=0;c<clump;c++){ p.set(P[v*3]+rand(-0.012,0.012),py+rand(-0.012,0.012),pz+rand(-0.012,0.012));
+        t.crossVectors(n,flow); if(t.lengthSq()<1e-4) t.set(1,0,0); t.normalize().applyAxisAngle(n,rand(-0.9,0.9));
+        const w=rand(0.012,0.026)*clamp(len/0.06+0.4,0.5,1.2), L=Math.min(cap,len*zoneMul*rand(0.6,1.15)), tx=n.x*L+flow.x*L*0.4, ty=n.y*L+flow.y*L*0.4, tz=n.z*L+flow.z*L*0.4, u0=Math.random();
+        const base=pos.length/3;
+        pos.push(p.x-t.x*w,p.y-t.y*w,p.z-t.z*w, p.x+t.x*w,p.y+t.y*w,p.z+t.z*w, p.x-t.x*w+tx,p.y-t.y*w+ty,p.z-t.z*w+tz, p.x+t.x*w+tx,p.y+t.y*w+ty,p.z+t.z*w+tz);
+        for(let k=0;k<4;k++){ nrm.push(n.x,n.y,n.z); col.push(Cc[v*3],Cc[v*3+1],Cc[v*3+2]); for(let j=0;j<4;j++){ si.push(SI[v*4+j]); sw.push(SW[v*4+j]); } fl.push(L); }
+        uv.push(u0,0, u0+0.18,0, u0,1, u0+0.18,1); idx.push(base,base+1,base+2, base+1,base+3,base+2); } }
     const fg=new THREE.BufferGeometry(); fg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); fg.setAttribute('normal',new THREE.Float32BufferAttribute(nrm,3)); fg.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
     fg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); fg.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(si,4)); fg.setAttribute('skinWeight',new THREE.Float32BufferAttribute(sw,4)); fg.setAttribute('finLen',new THREE.Float32BufferAttribute(fl,1)); fg.setIndex(idx);
     this.fins=new THREE.SkinnedMesh(fg,finMaterial(this.id)); this.fins.bind(this.skeleton,this.mesh.bindMatrix); this.fins.castShadow=false; this.fins.frustumCulled=false; this.fins.raycast=()=>{}; this.root.add(this.fins); this.stats.fins=idx.length/6; }

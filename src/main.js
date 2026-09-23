@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { clamp, lerp, damp, $, V3, B, KENNEL_POS, KENNEL_DIR } from './utils.js';
 import { Audio } from './audio.js';
 import { Save, stats, DECAY, world, TRICKS, training, achv, addStat } from './state.js';
-import { MOBILE, canvas, renderer, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, skyUniforms, rebuildEnv, kennelDoor, kennelDoorMeshes, kibble, waterMesh, clouds, ball, previewDots, Particles } from './scene.js';
+import { sky, MOBILE, canvas, renderer, TIME, scene, SKY_DAY, SKY_NIGHT, camera, controls, hemi, sun, porch, skyUniforms, rebuildEnv, kennelDoor, kennelDoorMeshes, kibble, waterMesh, clouds, ball, previewDots, Particles } from './scene.js';
 import { POSES, dante, kiara } from './dog.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -115,9 +115,14 @@ function updateDayNight(dt){ world.nightT=damp(world.nightT,world.night?1:0,1.6,
   scene.fog.color.copy(tmpC.copy(SKY_DAY).lerp(SKY_NIGHT,n)); scene.fog.color.multiplyScalar(lerp(1,0.35,n));
   sun.intensity=lerp(2.3,0.25,n); sun.color.copy(tmpC.set(0xfff1d6)).lerp(new THREE.Color(0x9fb6ff),n);
   hemi.intensity=lerp(0.95,0.22,n); hemi.color.copy(tmpC.set(0xcfe9ff)).lerp(new THREE.Color(0x3a4a8a),n);
-  if(world.autoClock){ const a=clamp((world.svHour-5.5)/13,0,1)*Math.PI; const el=Math.max(0.12,Math.sin(a)); sun.position.set(Math.cos(a)*11,el*11+1.5,4.5); const warm=1-clamp((el-0.12)/0.4,0,1); sun.color.lerp(new THREE.Color(0xffa060),warm*0.6*(1-n)); }
-  else sun.position.set(7,11,5);
-  porch.intensity=lerp(0,2.2,n); skyUniforms.uNight.value=n; skyUniforms.uSun.value.copy(sun.position).normalize();
+  // con HDRI: el sol de la luz direccional es el del cielo real; con reloj automático el cielo entero rota para que el sol siga la hora
+  let sunDir;
+  if(world.autoClock){ const a=clamp((world.svHour-5.5)/13,0,1)*Math.PI; const el=Math.max(0.12,Math.sin(a)); sunDir=V3(Math.cos(a)*11,el*11+1.5,4.5).normalize(); const warm=1-clamp((el-0.12)/0.4,0,1); sun.color.lerp(new THREE.Color(0xffa060),warm*0.6*(1-n)); }
+  else sunDir=V3(7,11,5).normalize();
+  if(sky.ready){ const hs=sky.hdrSun; const rot=Math.atan2(sunDir.z,sunDir.x)-Math.atan2(hs.z,hs.x); skyUniforms.uSkyRot.value=-rot;
+    const cr=Math.cos(rot),sr=Math.sin(rot); sunDir=V3(hs.x*cr-hs.z*sr,hs.y,hs.x*sr+hs.z*cr).normalize(); }
+  sun.position.copy(sunDir).multiplyScalar(14);
+  porch.intensity=lerp(0,2.2,n); skyUniforms.uNight.value=n; skyUniforms.uSun.value.copy(sunDir);
   renderer.toneMappingExposure=lerp(1.0,0.7,n);
   if(Math.abs(n-lastEnvN)>0.05){ lastEnvN=n; rebuildEnv(); } }
 let lastEnvN=-1;
@@ -144,7 +149,9 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) persist()
 let composer=null, aoPass=null;
 if(!MOBILE){ composer=new EffectComposer(renderer); composer.setPixelRatio(renderer.getPixelRatio()); composer.addPass(new RenderPass(scene,camera));
   aoPass=new GTAOPass(scene,camera,innerWidth,innerHeight); aoPass.output=GTAOPass.OUTPUT.Default; aoPass.blendIntensity=0.85;
-  aoPass.updateGtaoMaterial({radius:0.3,distanceExponent:1,thickness:1,scale:1,samples:12,distanceFallOff:1,screenSpaceRadius:false}); composer.addPass(aoPass); composer.addPass(new OutputPass()); }
+  aoPass.updateGtaoMaterial({radius:0.3,distanceExponent:1,thickness:1,scale:1,samples:12,distanceFallOff:1,screenSpaceRadius:false}); composer.addPass(aoPass); composer.addPass(new OutputPass());
+  // los sprites (corazones, pelos, zzz) y la sombra de contacto no deben ocluir: se ocultan solo durante el pase de AO
+  const ov=aoPass.overrideVisibility.bind(aoPass); aoPass.overrideVisibility=function(){ ov(); this.scene.traverse(o=>{ if(o.isSprite||o.userData.noAO) o.visible=false; }); }; }
 function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); if(composer){ composer.setSize(w,h); } }
 addEventListener('resize',resize); resize();
 const clock=new THREE.Clock(); let hudT=0, medalT=6; const camDelta=V3(), camGoal=V3();
