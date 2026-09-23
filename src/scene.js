@@ -126,20 +126,22 @@ const KIARA_BED=V3(-5.7,0,4.0), HOUSE_DOOR=V3(-2.4,0,WALL-0.3);
 }
 HOUSE_DOOR.set(-2.4,0,-WALL+0.9);
 const FUR_TEX=(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,256,256);
-  g.lineCap='round'; for(let i=0;i<14000;i++){const v=Math.floor(25+Math.random()*230);g.strokeStyle=`rgb(${v},${v},${v})`;g.lineWidth=rand(0.7,1.4);const x=Math.random()*256,y=Math.random()*256,a=rand(-0.5,0.5),l=rand(2,6);g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.sin(a)*l,y+Math.cos(a)*l);g.stroke();}
+  g.lineCap='round'; for(let i=0;i<9000;i++){const v=Math.floor(25+Math.random()*230);g.strokeStyle=`rgb(${v},${v},${v})`;g.lineWidth=rand(0.8,1.8);const x=Math.random()*256,y=Math.random()*256,a=rand(-0.6,0.6),l=rand(4,11);g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.sin(a)*l,y+Math.cos(a)*l);g.stroke();}
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(7,7);t.anisotropy=4;return t;})();
 const FUR_LAYERS=MOBILE?5:10;
 const furMatCache={};
 // material de una capa de pelo: desplaza la malla a lo largo de la normal, cae con "gravedad", se mece, y oscurece la raíz (oclusión)
-function furMaterial(color,len,layer,layers){ const key=color+'_'+len+'_'+layer; if(furMatCache[key])return furMatCache[key];
+function furMaterial(color,len,layer,layers,opts={}){ const vertex=!!opts.vertex; const key=color+'_'+len+'_'+layer+'_'+(vertex?'v':'s'); if(furMatCache[key])return furMatCache[key];
   const u=layer/layers; const c=new THREE.Color(color).lerp(new THREE.Color(0xf3c98a),0.16*u);
-  const m=new THREE.MeshStandardMaterial({color:c,roughness:0.92,alphaMap:FUR_TEX,alphaTest:0.5,side:THREE.DoubleSide});
+  const m=new THREE.MeshStandardMaterial({color:c,roughness:0.92,alphaMap:FUR_TEX,alphaTest:0.5,side:THREE.DoubleSide,vertexColors:vertex});
+  // el desplazamiento va DESPUÉS del skinning: así la capa sigue al hueso y objectNormal ya está deformada
   m.onBeforeCompile=sh=>{ sh.uniforms.uLayer={value:u}; sh.uniforms.uLen={value:len}; sh.uniforms.uTime=TIME;
-    sh.vertexShader='uniform float uLayer,uLen,uTime;\n'+sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
-      vec3 nrm=normalize(objectNormal); float d=uLayer*uLen; vec3 down=normalize((vec4(0.0,-1.0,0.0,0.0)*modelMatrix).xyz);
+    sh.vertexShader='uniform float uLayer,uLen,uTime;\n'+(vertex?'attribute float furLen; varying float vLen;\n':'')+sh.vertexShader.replace('#include <skinning_vertex>',`#include <skinning_vertex>
+      vec3 nrm=normalize(objectNormal); float d=uLayer*uLen${vertex?'*furLen':''}; ${vertex?'vLen=furLen;':''} vec3 down=normalize((vec4(0.0,-1.0,0.0,0.0)*modelMatrix).xyz);
       transformed+=nrm*d + down*d*uLayer*0.55 + vec3(sin(uTime*2.1+position.y*7.0),0.0,cos(uTime*1.7+position.x*6.0))*d*uLayer*0.10;`);
-    sh.fragmentShader='uniform float uLayer;\n'+sh.fragmentShader
+    sh.fragmentShader='uniform float uLayer;\n'+(vertex?'varying float vLen;\n':'')+sh.fragmentShader
       .replace('#include <alphamap_fragment>',`#ifdef USE_ALPHAMAP
+        ${vertex?'if(vLen<0.006) discard;':''}
         float hair=texture2D(alphaMap,vAlphaMapUv).g; diffuseColor.a*=step(0.05+pow(uLayer,0.8)*0.92,hair);
       #endif`)
       .replace('#include <color_fragment>',`#include <color_fragment>

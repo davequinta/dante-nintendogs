@@ -208,7 +208,7 @@ function updateAI(dt){
   if(ai.state!=='fetch_chase'&&ai.state!=='to_gate') D.pant=D.pant||(ai.state==='fetch_done');
   const tailTop=(ai.state==='cry'||ai.state==='sleep')?0:stats.felicidad/100;
   D.animate(dt,{wag:tailTop});
-  D.dirt.forEach(m=>m.visible=stats.limpieza<42);
+  D.setDirty(stats.limpieza<42);
   if(stats.energia<22&&D.target.eyes>0.6) D.target.eyes=0.55;
 }
 

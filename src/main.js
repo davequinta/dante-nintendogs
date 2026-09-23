@@ -23,7 +23,7 @@ function doThrow(dx,dy){ hidePreview(); if(Math.hypot(dx,dy)<18) return; const {
   if(ball.held) return; ball.mesh.visible=true; ball.mesh.position.copy(o); ball.vel.copy(v); ball.flying=true; ball.rest=false;
   ball.returnPt.copy(o).addScaledVector(f,1.2); ball.returnPt.y=0; ball.returnPt.x=clamp(ball.returnPt.x,-B+0.5,B-0.5); ball.returnPt.z=clamp(ball.returnPt.z,-B+0.5,B-0.5);
   Audio.swish(); if(!world.night&&ai.state!=='bark'&&ai.state!=='to_gate'&&ai.state!=='eat'&&ai.state!=='drink') setState('fetch_chase'); }
-function petTick(hit){ const zone=hit.object.userData.zone||'body';
+function petTick(hit){ const zone=dante.zoneAt(hit);
   if(tool==='brush'){ addStat('limpieza',0.9); addStat('felicidad',0.15); for(let i=0;i<2;i++) Particles.spawn('hair',hit.point,{life:1.1,speed:0.8,size:0.16,grav:1.5}); if(Math.random()<0.25)Audio.swish(); if(Math.random()<0.05)say('brush',2); if(FREE.has(ai.state)&&ai.state!=='groom'&&ai.state!=='bellyup') setState('groom'); ai.petting=true; ai.afterPet=0.8; return; }
   addStat('felicidad',0.5); if(Math.random()<0.5) Particles.spawn('heart',hit.point.clone().add(V3(0,0.1,0)),{life:1.1,speed:0.7,size:0.22});
   if(Math.random()<0.06){ if(zone==='head')say('petHead',1.8); else if(zone==='tail')say('petTail',1.8); }

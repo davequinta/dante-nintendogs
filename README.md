@@ -43,6 +43,19 @@ npx vercel --prod   # producción
 
 Cada push a `main` en GitHub también despliega si el repo está conectado al proyecto de Vercel.
 
+## Cómo está hecho Dante (técnicas de Three.js)
+
+Todo el perro sale de código; no hay modelos externos.
+
+- **Esqueleto propio**: 19 `Bone` (cuerpo, cuello, cabeza, mandíbula, orejas, 4 patas de dos segmentos, cola de 5 segmentos) en un `Skeleton`.
+- **Forma por campo de distancia**: cada hueso lleva elipsoides y cápsulas (funciones SDF) que se funden con una unión suave exponencial. La boca y las cuencas de los ojos se tallan restando un bloque y dos elipsoides.
+- **Marching cubes**: la superficie se extrae de la grilla de distancias con vértices compartidos por arista, normales calculadas del gradiente del campo y UVs triplanares. Las tablas de casos vienen del addon `MarchingCubes` de three; el polígonizador es propio. Tarda unos 200 ms.
+- **Skinning calculado a mano**: cada vértice recibe hasta 4 huesos con pesos según la distancia a las primitivas que lo formaron, y va a un `SkinnedMesh`. Con eso las poses (sit, platz, panza arriba, pose de show) y la marcha son solo rotaciones de huesos.
+- **Colores por vértice**: el manto negro, el fuego y la máscara se mezclan en los bordes ponderando las primitivas cercanas, así no hay costuras.
+- **Pelo por capas (shells)**: 10 copias del `SkinnedMesh` (5 en celular) con un `MeshStandardMaterial` modificado en `onBeforeCompile`: después del skinning cada capa se desplaza por la normal según un largo por vértice, cae con gravedad, se mece con el tiempo y oscurece la raíz. Un mapa de ruido de hebras decide qué fragmentos sobreviven en cada capa.
+- **Escena**: domo de cielo con shader que también genera el mapa de entorno (`PMREMGenerator`), grama con `InstancedMesh` y vertex shader de viento, texturas y relieves procedurales en canvas, sombras PCF suaves y `OrbitControls` acotados.
+- **Interacción**: `Raycaster` sobre la malla skineada; la zona acariciada (cabeza, panza, cola) sale de un atributo por vértice.
+
 ## Cómo se juega
 
 - **Acariciar**: arrastrá sobre él. Cabeza, panza y cola reaccionan distinto.
