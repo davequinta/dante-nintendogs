@@ -12,7 +12,7 @@ Estado del proyecto al 23 de septiembre de 2026. Todo lo que se ve acá sale de 
 
 ## Qué se logró solo con código
 
-- **Perro generado por campo de distancia**: unas 70 elipsoides y cápsulas colgadas de 23 huesos, fundidas con unión suave, talladas (boca, cuencas) y extraídas con un marching cubes propio. 33 mil vértices en 0.4 s.
+- **Perro generado por campo de distancia**: 101 formas (elipsoides y cápsulas, más 3 que restan para tallar la boca y las cuencas) colgadas de 23 huesos, fundidas con unión suave y extraídas con un marching cubes propio. 33 mil vértices en unos 330 ms.
 - **Skinning y colores calculados a mano**: pesos por hueso según la distancia a cada primitiva; patrón del pelaje pintado por función en el espacio de cada hueso, afinado contra las fotos.
 - **Anatomía de pastor alemán**: cruz alta, lomo inclinado, pecho profundo, patas traseras anguladas con pies que pisan planos, cabeza en cuña con stop, hocico largo con belfos, pómulos, arcos de cejas.
 - **Cara**: ojos que se colocan solos sobre la superficie real, casi sin blanco, párpados que envuelven y parpadean, iris y pupila, brillo, nariz con fosas, colmillos, lengua.
