@@ -209,7 +209,9 @@ function adaptResolution(dt){ fpsEma=lerp(fpsEma,1/Math.max(dt,1e-3),0.05);
   if(fpsEma<28){ lowT+=dt; highT=0; } else if(fpsEma>55){ highT+=dt; lowT=0; } else { lowT=highT=0; }
   if(lowT>2&&curPR>0.55){ curPR=Math.max(0.55,curPR-0.15); renderer.setPixelRatio(curPR); if(composer)composer.setPixelRatio(curPR); resize(); lowT=0; toast('Bajando resolución para que vaya fluido',1.6); }
   if(highT>6&&curPR<BASE_PR){ curPR=Math.min(BASE_PR,curPR+0.15); renderer.setPixelRatio(curPR); if(composer)composer.setPixelRatio(curPR); resize(); highT=0; } }
-function frame(){ requestAnimationFrame(frame); const dt=Math.min(clock.getDelta(),0.05); world.time+=dt; TIME.value=world.time;
+// Simulación de un paso. Cada paso avanza como máximo 0.05 s; con world.maxSubsteps > 1 (solo lo usan las pruebas) un frame lento
+// se reparte en varios pasos, para que en CI sin GPU, a ~1 fps, el tiempo de juego avance igual que el real.
+function simulate(dt){ world.time+=dt; TIME.value=world.time;
   for(const k in DECAY){ if(k==='energia'&&ai.state==='sleep')continue; addStat(k,-DECAY[k]*dt/60); }
   updateAI(dt); dante.root.updateMatrixWorld(true);
   updateBall(dt); updateVisit(dt); updateKiara(dt); updateFlies(dt); Particles.update(dt); updateDayNight(dt); updateClock(dt);
@@ -217,6 +219,9 @@ function frame(){ requestAnimationFrame(frame); const dt=Math.min(clock.getDelta
   medalT-=dt; if(medalT<0){ medalT=4; checkMedals(); }
   kibble.scale.y=Math.max(0.05,world.food); kibble.visible=world.food>0.02; waterMesh.scale.y=Math.max(0.05,world.water); waterMesh.visible=world.water>0.02;
   for(const c of clouds){ c.position.x+=c.userData.v*dt; if(c.position.x>34)c.position.x=-34; }
+}
+function frame(){ requestAnimationFrame(frame); const real=clock.getDelta(); const n=Math.max(1,Math.min(world.maxSubsteps||1,Math.ceil(real/0.05)));
+  const dt=Math.min(real/n,0.05); for(let i=0;i<n;i++) simulate(dt);
   // cámara: libre sigue suavemente sin quitar la órbita; seguir va detrás de él; selfie va delante de su cara
   const dp=dante.root.position;
   if(camMode==='free'){ camGoal.set(dp.x*0.55,0.6,dp.z*0.55); camDelta.copy(camGoal).sub(controls.target).multiplyScalar(1-Math.exp(-1.8*dt)); controls.target.add(camDelta); camera.position.add(camDelta); controls.update(); }
